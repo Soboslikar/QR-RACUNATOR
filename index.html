@@ -166,7 +166,7 @@
         }
     }
 
-    // *** NOVO: Funkcija za slanje logova (ISPRAVNA verzija s application/json) ***
+      // *** NOVO: Funkcija za slanje logova (Koristi URLSearchParams za zaobilaženje CORS-a) ***
     async function logUsageEvent(eventType, details = null) {
         if (!userId || !firstUseTimestamp) {
              console.warn("UserID/FirstUseTimestamp nisu spremni. Čekam...");
@@ -179,7 +179,6 @@
 
         console.log(`Logging event: ${eventType}`, details);
 
-        // <<< --- ISPRAVAK: Kreiranje logData objekta JE OVDJE --- >>>
         const logData = {
             firstUseTimestamp: firstUseTimestamp,
             userId: userId,
@@ -191,47 +190,47 @@
             userAgent: navigator.userAgent || '-',
             details: details ? JSON.stringify(details) : ''
         };
-        // <<< --- KRAJ ISPRAVKA --- >>>
 
         try {
-            // Ispis podataka koji se šalju
-            console.log("Podaci za slanje (kao JSON):", logData); // Sada bi trebao ispisati puni objekt
+            // Kreiraj URLSearchParams objekt
+            const formData = new URLSearchParams();
+            // Dodaj JSON string kao vrijednost jednog parametra
+            formData.append('logData', JSON.stringify(logData));
+
+            console.log("Podaci za slanje (kao URLSearchParams):", formData.toString());
 
             const response = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'cors',
+                mode: 'cors', // Važno za cross-origin
                 cache: 'no-cache',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                // NE postavljamo Content-Type ručno, preglednik će staviti application/x-www-form-urlencoded
                 redirect: 'follow',
-                body: JSON.stringify(logData) // Šaljemo ispravan objekt pretvoren u string
+                body: formData // Šaljemo URLSearchParams objekt
             });
 
             console.log(`Log zahtjev poslan. Status odgovora: ${response.status}`);
 
             if (response.ok) {
-                const result = await response.json().catch(() => ({ message: "Odgovor nije JSON."}));
+                // Očekujemo JSON odgovor od naše (ispravljene) doPost funkcije
+                const result = await response.json().catch(() => ({ status: "error", message: "Odgovor servera nije JSON."}));
                 console.log("Log response:", result.status === 'success' ? result.message : `Greška u odgovoru: ${result.message || 'Nepoznata greška servera.'}`);
                  if (result.status !== 'success') {
                      console.error("DoPost vratio grešku:", result.message);
                  }
             } else {
-                console.error("Log request failed:", response.status, response.statusText);
+                // Ako i ovaj zahtjev ne uspije, logiraj grešku
+                console.error("Log request failed (URLSearchParams):", response.status, response.statusText);
                  try {
                      const errorText = await response.text();
-                     console.error("Log error body:", errorText);
-                 } catch (e) { console.error("Could not read error body for failed log request"); }
+                     console.error("Log error body (URLSearchParams):", errorText);
+                 } catch (e) { console.error("Could not read error body"); }
             }
         } catch (error) {
-            console.error("Error sending log event:", error);
-             if (error instanceof TypeError && error.message.includes('fetch')) {
-                 console.error(">>> Dogodio se 'TypeError: Failed to fetch'!");
-             }
+            // Ova greška bi sada trebala biti rijetka, osim ako je stvarni mrežni problem
+            console.error("Error sending log event (URLSearchParams):", error);
         }
     }
     // --- Kraj funkcije ---
-
     // *** POMOĆNE FUNKCIJE ***
     const parseTime = (timeStr) => { if (!timeStr || typeof timeStr !== 'string' || timeStr === '??:??' || timeStr.length !== 5 || timeStr[2] !== ':') return -1; const parts = timeStr.split(':'); const hours = parseInt(parts[0], 10); const minutes = parseInt(parts[1], 10); if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1; return hours * 60 + minutes; };
     function playSound(id) { const sound = document.getElementById(id); if (sound) { sound.pause(); sound.currentTime = 0; sound.play().catch(error => { if (error.name !== 'NotAllowedError' && error.name !== 'AbortError') console.warn(`Zvuk "${id}" greška:`, error); }); } else console.warn(`Audio element "${id}" nije pronađen.`); }

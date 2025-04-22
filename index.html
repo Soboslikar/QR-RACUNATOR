@@ -166,81 +166,70 @@
         }
     }
 
-       // *** NOVO: Funkcija za slanje logova (Konačna Verzija s application/json) ***
-    async function logUsageEvent(eventType, details = null) {
-        if (!userId || !firstUseTimestamp) {
-             console.warn("UserID/FirstUseTimestamp nisu spremni. Čekam...");
-             await new Promise(resolve => setTimeout(resolve, 100));
-             if (!userId || !firstUseTimestamp) {
-                 console.error("UserID/FirstUseTimestamp i dalje nedostaju. Preskačem logiranje.");
-                 return;
-             }
-        }
-
-        console.log(`Logging event: ${eventType}`, details);
-
-        const logData = {
-            firstUseTimestamp: firstUseTimestamp,
-            userId: userId,
-            timestamp: new Date().toISOString(),
-            event: eventType,
-            counter1: brojac,
-            counter2: brojac2,
-            active: isCounterDecrementActive,
-            userAgent: navigator.userAgent || '-',
-            details: details ? JSON.stringify(details) : ''
-        };
-
-        try {
-            // --- IZMJENA: Šaljemo kao FormData ili URLSearchParams umjesto direktnog JSON-a ---
-            // Ovo ponekad zaobilazi CORS probleme s application/json prema Apps Scriptu
-            // Iako doPost očekuje JSON, probat ćemo ovako poslati stringified JSON
-            // Apps Script će ga morati parsirati iz e.postData.contents
-
-            const formData = new URLSearchParams(); // Koristimo URLSearchParams
-            formData.append('logData', JSON.stringify(logData)); // Šaljemo JSON kao string unutar jednog parametra
-
-            console.log("Podaci za slanje (kao URLSearchParams):", formData.toString());
-
-            const response = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'cors',
-                cache: 'no-cache',
-                 // ---> NE POSTAVLJAMO Content-Type header ručno <---
-                 // Preglednik će automatski postaviti 'application/x-www-form-urlencoded'
-                 // kad šaljemo URLSearchParams, što često lakše prolazi CORS.
-                // headers: {
-                //     'Content-Type': 'application/json', // Maknuto!
-                // },
-                redirect: 'follow',
-                body: formData // Šaljemo URLSearchParams objekt
-            });
-             // ---> KRAJ IZMJENE U SLANJU <---
-
-
-            console.log(`Log zahtjev poslan. Status odgovora: ${response.status}`);
-
-            if (response.ok) {
-                const result = await response.json().catch(() => ({ message: "Odgovor nije JSON."})); // Čitaj JSON odgovor od doPost
-                console.log("Log response:", result.status === 'success' ? result.message : `Greška u odgovoru: ${result.message || 'Nepoznata greška servera.'}`);
-                 if (result.status !== 'success') {
-                     console.error("DoPost vratio grešku:", result.message);
-                 }
-            } else {
-                console.error("Log request failed:", response.status, response.statusText);
-                 try {
-                     const errorText = await response.text();
-                     console.error("Log error body:", errorText);
-                 } catch (e) { console.error("Could not read error body for failed log request"); }
-            }
-        } catch (error) {
-            console.error("Error sending log event:", error);
-             if (error instanceof TypeError && error.message.includes('fetch')) {
-                 console.error(">>> OPET 'TypeError: Failed to fetch'! Problem je vjerojatno CORS ili mreža.");
-             }
-        }
+     // *** NOVO: Funkcija za slanje logova (VRAĆAMO application/json) ***
+async function logUsageEvent(eventType, details = null) {
+    if (!userId || !firstUseTimestamp) {
+         console.warn("UserID/FirstUseTimestamp nisu spremni. Čekam...");
+         await new Promise(resolve => setTimeout(resolve, 100));
+         if (!userId || !firstUseTimestamp) {
+             console.error("UserID/FirstUseTimestamp i dalje nedostaju. Preskačem logiranje.");
+             return;
+         }
     }
-    // --- Kraj nove funkcije ---
+
+    console.log(`Logging event: ${eventType}`, details);
+
+    const logData = {
+        firstUseTimestamp: firstUseTimestamp,
+        userId: userId,
+        timestamp: new Date().toISOString(),
+        event: eventType,
+        counter1: brojac,
+        counter2: brojac2,
+        active: isCounterDecrementActive,
+        userAgent: navigator.userAgent || '-',
+        details: details ? JSON.stringify(details) : ''
+    };
+
+    try {
+        console.log("Podaci za slanje (kao JSON):", logData);
+
+        const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: {
+                // <<< VRAĆAMO application/json >>>
+                'Content-Type': 'application/json',
+            },
+            redirect: 'follow',
+            // <<< VRAĆAMO slanje JSON stringa >>>
+            body: JSON.stringify(logData)
+        });
+
+        console.log(`Log zahtjev poslan. Status odgovora: ${response.status}`);
+
+        if (response.ok) {
+            const result = await response.json().catch(() => ({ message: "Odgovor nije JSON."}));
+            console.log("Log response:", result.status === 'success' ? result.message : `Greška u odgovoru: ${result.message || 'Nepoznata greška servera.'}`);
+             if (result.status !== 'success') {
+                 console.error("DoPost vratio grešku:", result.message);
+             }
+        } else {
+            console.error("Log request failed:", response.status, response.statusText);
+             try {
+                 const errorText = await response.text();
+                 console.error("Log error body:", errorText);
+             } catch (e) { console.error("Could not read error body for failed log request"); }
+        }
+    } catch (error) {
+        console.error("Error sending log event:", error);
+         if (error instanceof TypeError && error.message.includes('fetch')) {
+             console.error(">>> OPET 'TypeError: Failed to fetch'! Problem je vjerojatno CORS.");
+         }
+    }
+}
+// --- Kraj funkcije ---
     // *** POMOĆNE FUNKCIJE ***
     const parseTime = (timeStr) => { if (!timeStr || typeof timeStr !== 'string' || timeStr === '??:??' || timeStr.length !== 5 || timeStr[2] !== ':') return -1; const parts = timeStr.split(':'); const hours = parseInt(parts[0], 10); const minutes = parseInt(parts[1], 10); if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1; return hours * 60 + minutes; };
     function playSound(id) { const sound = document.getElementById(id); if (sound) { sound.pause(); sound.currentTime = 0; sound.play().catch(error => { if (error.name !== 'NotAllowedError' && error.name !== 'AbortError') console.warn(`Zvuk "${id}" greška:`, error); }); } else console.warn(`Audio element "${id}" nije pronađen.`); }

@@ -175,7 +175,64 @@
     const parseTime = (timeStr) => { if (!timeStr || typeof timeStr !== 'string' || timeStr === '??:??' || timeStr.length !== 5 || timeStr[2] !== ':') return -1; const parts = timeStr.split(':'); const hours = parseInt(parts[0], 10); const minutes = parseInt(parts[1], 10); if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1; return hours * 60 + minutes; };
     function playSound(id) { const sound = document.getElementById(id); if (sound) { sound.pause(); sound.currentTime = 0; sound.play().catch(error => { if (error.name !== 'NotAllowedError' && error.name !== 'AbortError') console.warn(`Zvuk "${id}" greška:`, error); }); } else console.warn(`Audio element "${id}" nije pronađen.`); }
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date)) { console.error("getISODateString primio neispravan datum:", date); return null; } const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
-    function normalizeDateForSearch(dateString) { if (!dateString || typeof dateString !== 'string') return null; const cleanedString = dateString.trim().replace(/\s/g, ''); const parts = cleanedString.split(/[.\/-]/); if (parts.length === 3) { let [d, m, y] = parts.map(part => parseInt(part.trim(), 10)); if (isNaN(d) || isNaN(m) || isNaN(y) || d < 1 || d > 31 || m < 1 || m > 12 || y < 0) return null; if (y >= 0 && y <= 99) { const currentYearLastTwoDigits = new Date().getFullYear() % 100; y = (y <= currentYearLastTwoDigits + 5) ? 2000 + y : 1900 + y; } else if (y < 1900 || y > 2100) { return null; } return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; } return cleanedString.toLowerCase(); }
+      function normalizeDateForSearch(dateString) {
+        if (!dateString || typeof dateString !== 'string') return null;
+
+        // <<< NOVO: Ukloni eventualnu točku ili razmak s kraja >>>
+        let cleanedString = dateString.trim().replace(/[.\s]$/, ''); // Uklanja zadnju točku ili razmak
+
+        // Nastavi s postojećom logikom čišćenja i parsiranja
+        cleanedString = cleanedString.replace(/\s/g, ''); // Ukloni ostale razmake
+        const parts = cleanedString.split(/[.\/-]/);
+
+        if (parts.length === 3) {
+            let [d, m, y] = parts.map(part => parseInt(part.trim(), 10));
+
+            // Provjeri jesu li brojevi validni
+            if (isNaN(d) || isNaN(m) || isNaN(y) || d < 1 || d > 31 || m < 1 || m > 12 || y < 0) {
+                 console.log("NormalizeDate: Parsirani dijelovi nisu validni brojevi/datumi", d, m, y); // DEBUG
+                 return cleanedString.toLowerCase(); // Vrati očišćeni string ako parsiranje ne uspije
+            }
+
+            // <<< POBOLJŠANA LOGIKA ZA GODINU (YY -> YYYY) >>>
+            if (y >= 0 && y <= 99) {
+                const currentYear = new Date().getFullYear();
+                const currentCentury = Math.floor(currentYear / 100) * 100; // Npr. 2000
+                const yearWithCentury = currentCentury + y;
+
+                // Pretpostavi da se odnosi na trenutno ili buduće stoljeće
+                // Ako je rezultat npr. 2025, a trenutna je 2024, to je OK.
+                // Ako je rezultat npr. 2070, a trenutna je 2024, to je OK.
+                // Ako je rezultat 2005, a trenutna 2024, to je OK.
+                // Ovo pokriva većinu slučajeva, osim vrlo starih datuma ako bi netko unosio YY.
+                y = yearWithCentury;
+
+                 // Dodatna provjera da godina nije predaleko u prošlosti ili budućnosti
+                 if (y < 1970 || y > currentYear + 50) { // Npr. ne dozvoli prije 1970 ili više od 50 god u budućnost
+                      console.log("NormalizeDate: Godina izvan razumnog raspona:", y); // DEBUG
+                      return cleanedString.toLowerCase(); // Vrati originalni string ako je godina čudna
+                 }
+
+            } else if (y < 1970 || y > new Date().getFullYear() + 50) { // Provjera i za pune godine
+                console.log("NormalizeDate: Puna godina izvan razumnog raspona:", y); // DEBUG
+                return cleanedString.toLowerCase(); // Vrati originalni string
+            }
+            // <<< KRAJ POBOLJŠANE LOGIKE ZA GODINU >>>
+
+
+            // Formatiraj u YYYY-MM-DD
+             const finalYear = y;
+             const finalMonth = String(m).padStart(2, '0');
+             const finalDay = String(d).padStart(2, '0');
+             const isoDate = `${finalYear}-${finalMonth}-${finalDay}`;
+             console.log("NormalizeDate: Uspješno normalizirano u ISO:", isoDate); // DEBUG
+             return isoDate;
+        }
+
+        // Ako nije format s 3 dijela, vrati originalni očišćeni string malim slovima
+        console.log("NormalizeDate: Nije format D/M/Y, vraćam kao tekst:", cleanedString.toLowerCase()); // DEBUG
+        return cleanedString.toLowerCase();
+    }
     function showTemporaryMessage(messageText, duration = 1500) { if (!loadedMsg) return; loadedMsg.innerText = messageText; loadedMsg.style.display = 'block'; loadedMsg.style.animation = 'none'; loadedMsg.offsetHeight; loadedMsg.style.animation = 'zoomFade 1s ease-out'; setTimeout(() => { if (loadedMsg && loadedMsg.innerText === messageText) { loadedMsg.style.display = 'none'; } }, duration); }
 
     // *** FUNKCIJE ZA LOKALNU POHRANU ***

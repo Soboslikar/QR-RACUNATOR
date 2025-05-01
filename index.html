@@ -661,24 +661,87 @@
         });
     };
 
-    // Modificirana stopScanner funk{
-             [
-  {
-    "action": "replace",
-    "function_name": "stopScanner",
-    "code": "    // AŽURIRAN: stopScanner - čisti i html5QrCodeInstance\n    function stopScanner() {\n        if(runningTextContainer) runningTextContainer.style.display = 'none';\n        if(sharePromptOverlay) sharePromptOverlay.style.display = 'none';\n        if(counterDeactivatedIndicator) counterDeactivatedIndicator.style.display = 'none';\n        if(switchCameraButton) switchCameraButton.style.display = 'none';\n        if(cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none';\n\n        const instanceToStop = html5QrCodeInstance;\n        if (instanceToStop && isScannerActive) {\n            console.log(\"Zaustavljam skener (instance postoji i aktivan je)...\");\n            isScannerActive = false; // Postavi na false PRIJE poziva stop()\n            if (instructionDiv) instructionDiv.style.display = 'none';\n\n            return instanceToStop.stop().then(() => {\n                console.log(\"Skener uspješno zaustavljen (iz stop()).\");\n                if (readerDiv) readerDiv.innerHTML = '';\n            }).catch(err => {\n                console.warn(\"Greška pri zaustavljanju skenera (možda već bio zaustavljen):\", err);\n                if (readerDiv) readerDiv.innerHTML = '';\n            }).finally(() => {\n                // <<< DODANO: Nulliraj instancu nakon zaustavljanja >>>\n                html5QrCodeInstance = null;\n                console.log(\"html5QrCodeInstance postavljen na null u stopScanner.finally.\");\n            });\n        } else {\n             console.log(\"Skener nije aktivan ili instanca ne postoji, nema potrebe za zaustavljanjem.\");\n             isScannerActive = false; // Osiguraj da je false\n             if (readerDiv) readerDiv.innerHTML = '';\n             // <<< DODANO: Nulliraj instancu i ovdje za svaki slučaj >>>\n             if (html5QrCodeInstance) {\n                html5QrCodeInstance = null;\n                console.log(\"html5QrCodeInstance postavljen na null (skener nije bio aktivan).\");\n             }\n             return Promise.resolve(); // Vrati resolved promise odmah\n        }\n    };"
-  }
-]
+    // Modificirana stopScanner funkcija
+    function stopScanner() {
+        if(runningTextContainer) runningTextContainer.style.display = 'none';
+        if(sharePromptOverlay) sharePromptOverlay.style.display = 'none';
+        if(counterDeactivatedIndicator) counterDeactivatedIndicator.style.display = 'none';
+        if(switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb kad se skener gasi
+        if(cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij i overlay
+
+        const instanceToStop = html5QrCodeInstance;
+        if (instanceToStop && isScannerActive) {
+            console.log("Zaustavljam skener...");
+            isScannerActive = false; // Postavi na false PRIJE poziva stop()
+            if (instructionDiv) instructionDiv.style.display = 'none';
+
+            return instanceToStop.stop().then(() => {
+                console.log("Skener uspješno zaustavljen.");
+                if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz
+            }).catch(err => {
+                console.warn("Greška pri zaustavljanju skenera (možda već bio zaustavljen):", err);
+                if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz svejedno
+            }).finally(() => {
+                // Ne treba nullirati html5QrCodeInstance ovdje
+            });
+        } else {
+             console.log("Skener nije aktivan ili instanca ne postoji, nema potrebe za zaustavljanjem.");
+             isScannerActive = false; // Osiguraj da je false
+             if (readerDiv) readerDiv.innerHTML = ''; // Očisti za svaki slučaj
+             return Promise.resolve(); // Vrati resolved promise
+        }
+    };
 
     // *** NOVE FUNKCIJE za odabir kamere ***
 
-    [
-  {
-    "action": "replace",
-    "function_name": "toggleCameraSelection",
-    "code": "    // AŽURIRANA: toggleCameraSelection - PRVO ZAUSTAVLJA SKENER AKO JE AKTIVAN\n    function toggleCameraSelection() {\n        playSound('click-sound');\n        if (!cameraSelectionOverlay || !cameraListUl || !switchCameraButton) return;\n\n        // Ako je overlay već vidljiv, samo ga sakrij\n        if (cameraSelectionOverlay.style.display === 'block') {\n            cameraSelectionOverlay.style.display = 'none';\n            return;\n        }\n\n        console.log(\"--- toggleCameraSelection: Pokrenuto ---\");\n\n        // Funkcija za dohvaćanje i prikaz kamera\n        const listAndShowCameras = () => {\n            console.log(\"--- toggleCameraSelection: Pokušavam dohvatiti kamere (nakon stop/ili nije bio aktivan) ---\");\n            Html5Qrcode.getCameras().then(devices => {\n                console.log(\"--- toggleCameraSelection: getCameras() USPJEH! ---\");\n                console.log(\"Raw devices data:\", JSON.stringify(devices));\n\n                if (!devices || devices.length === 0) {\n                    console.warn(\"toggleCameraSelection: Nema pronađenih kamera nakon uspješnog poziva?\");\n                    showTemporaryMessage(\"Nema dostupnih kamera.\", 1500);\n                    return;\n                }\n\n                devicesList = devices; // Ažuriraj globalnu listu\n                cameraListUl.innerHTML = ''; // Očisti prethodni popis\n                const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY);\n\n                try { // Dodaj try...catch oko petlje\n                    devices.forEach((device, index) => {\n                        const listItem = document.createElement('li');\n                        // Vraćamo prikaz labela, ali s fallbackom\n                        listItem.textContent = device.label || `Kamera ${index + 1} (ID: ...${device.id.slice(-6)})`;\n                        listItem.dataset.cameraId = device.id;\n                        listItem.title = `${device.label || 'N/A'} (${device.id})`;\n\n                        if (device.id === currentActiveCameraId) {\n                            listItem.classList.add('selected-camera');\n                        }\n\n                        const newListItem = listItem.cloneNode(true);\n                        newListItem.addEventListener('click', () => {\n                            // Proslijedi label radi poruke korisniku u switchCamera\n                            switchCamera(device.id, device.label || `Kamera ${index + 1}`);\n                        });\n                        cameraListUl.appendChild(newListItem);\n                    });\n                } catch (listError) {\n                     console.error(\"--- toggleCameraSelection: Greška unutar OBRADE liste kamera! ---\", listError);\n                     showTemporaryMessage(\"Greška pri obradi liste kamera.\", 2000);\n                     cameraSelectionOverlay.style.display = 'none';\n                     return; // Prekini ako je greška u listi\n                }\n\n                console.log(\"--- toggleCameraSelection: Lista kamera uspješno generirana. Prikazujem overlay.\");\n                cameraSelectionOverlay.style.display = 'block'; // Pokaži overlay\n\n            }).catch(err => {\n                console.error(\"--- toggleCameraSelection: getCameras() FAILED! ---Detaljna greška:\", err);\n                console.error(\"Error Name:\", err.name);\n                console.error(\"Error Message:\", err.message);\n                showTemporaryMessage(\"Greška pri listanju kamera.\", 2000);\n                cameraSelectionOverlay.style.display = 'none';\n            });\n        };\n\n        // <<< KLJUČNA IZMJENA: Provjeri je li skener aktivan >>>\n        if (isScannerActive && html5QrCodeInstance) {\n            console.log(\"--- toggleCameraSelection: Skener je aktivan, prvo ga zaustavljam...\");\n            stopScanner().then(() => {\n                console.log(\"--- toggleCameraSelection: Skener zaustavljen (iz then), sada listam kamere...\");\n                listAndShowCameras(); // Pozovi listanje NAKON što je stop() završio\n            }).catch(stopError => {\n                // Iako stopScanner hvata svoje greške, za svaki slučaj\n                console.error(\"--- toggleCameraSelection: Neočekivana greška pri zaustavljanju skenera ---\", stopError);\n                // Možda pokušati listati svejedno?\n                // listAndShowCameras();\n                 showTemporaryMessage(\"Greška pri zaustavljanju kamere.\", 2000);\n            });\n        } else {\n            // Ako skener nije bio aktivan, samo listaj kamere\n            console.log(\"--- toggleCameraSelection: Skener nije aktivan, direktno listam kamere...\");\n            listAndShowCameras();\n        }\n    }"
-  }
-]
+    function toggleCameraSelection() {
+         playSound('click-sound');
+         if (!cameraSelectionOverlay || !cameraListUl || !switchCameraButton) return;
+
+         // Ako je overlay vidljiv, sakrij ga
+         if (cameraSelectionOverlay.style.display === 'block') {
+             cameraSelectionOverlay.style.display = 'none';
+             return;
+         }
+
+         // Inače, dohvati kamere i prikaži ih
+         Html5Qrcode.getCameras().then(devices => {
+             if (!devices || devices.length === 0) {
+                 showTemporaryMessage("Nema dostupnih kamera.", 1500);
+                 return;
+             }
+
+             cameraListUl.innerHTML = ''; // Očisti prethodni popis
+             const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY); // Dohvati trenutno aktivnu (ili zadnje spremljenu)
+
+             devices.forEach(device => {
+                 const listItem = document.createElement('li');
+                 // Prikaz labela može biti dug, koristi textContent
+                 listItem.textContent = device.label || `Kamera ${device.id.substring(0, 8)}...`;
+                 listItem.dataset.cameraId = device.id;
+                 listItem.title = device.label || device.id; // Puni label u tooltipu
+
+                 // Opcionalno: Oznaci trenutno odabranu
+                 if (device.id === currentActiveCameraId) {
+                     listItem.classList.add('selected-camera');
+                 }
+
+                 // Kloniraj node da se ukloni stari listener ako postoji
+                 const newListItem = listItem.cloneNode(true);
+                 newListItem.addEventListener('click', () => {
+                     switchCamera(device.id, device.label);
+                 });
+                 cameraListUl.appendChild(newListItem);
+             });
+
+             cameraSelectionOverlay.style.display = 'block'; // Pokaži overlay
+
+         }).catch(err => {
+             console.error("Greška dohvaćanja kamera za popis:", err);
+             showTemporaryMessage("Greška pri listanju kamera.", 1500);
+             cameraSelectionOverlay.style.display = 'none'; // Sakrij ako je greška
+         });
+    }
 
     function switchCamera(selectedCameraId, cameraLabel) {
         playSound('click-sound');

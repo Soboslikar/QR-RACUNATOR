@@ -692,9 +692,7 @@
         }
     };
 
-    // *** NOVE FUNKCIJE za odabir kamere ***
-
-    function toggleCameraSelection() {
+       function toggleCameraSelection() {
          playSound('click-sound');
          if (!cameraSelectionOverlay || !cameraListUl || !switchCameraButton) return;
 
@@ -704,45 +702,54 @@
              return;
          }
 
-         // Inače, dohvati kamere i prikaži ih
-         Html5Qrcode.getCameras().then(devices => {
-             if (!devices || devices.length === 0) {
-                 showTemporaryMessage("Nema dostupnih kamera.", 1500);
-                 return;
-             }
-
-             cameraListUl.innerHTML = ''; // Očisti prethodni popis
-             const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY); // Dohvati trenutno aktivnu (ili zadnje spremljenu)
-
-             devices.forEach(device => {
-                 const listItem = document.createElement('li');
-                 // Prikaz labela može biti dug, koristi textContent
-                 listItem.textContent = device.label || `Kamera ${device.id.substring(0, 8)}...`;
-                 listItem.dataset.cameraId = device.id;
-                 listItem.title = device.label || device.id; // Puni label u tooltipu
-
-                 // Opcionalno: Oznaci trenutno odabranu
-                 if (device.id === currentActiveCameraId) {
-                     listItem.classList.add('selected-camera');
+         // *** DODAN OVAJ DIO ***
+         // Prije listanja kamera, zaustavi trenutni skener ako je aktivan
+         console.log("toggleCameraSelection: Pokušavam zaustaviti skener prije listanja kamera.");
+         stopScanner().finally(() => {
+             console.log("toggleCameraSelection: Skener zaustavljen (ili nije bio aktivan). Dohvaćam kamere...");
+             // Inače, dohvati kamere i prikaži ih
+             Html5Qrcode.getCameras().then(devices => {
+                 if (!devices || devices.length === 0) {
+                     showTemporaryMessage("Nema dostupnih kamera.", 1500);
+                     return;
                  }
 
-                 // Kloniraj node da se ukloni stari listener ako postoji
-                 const newListItem = listItem.cloneNode(true);
-                 newListItem.addEventListener('click', () => {
-                     switchCamera(device.id, device.label);
+                 cameraListUl.innerHTML = ''; // Očisti prethodni popis
+                 const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY); // Dohvati trenutno aktivnu (ili zadnje spremljenu)
+
+                 devices.forEach(device => {
+                     const listItem = document.createElement('li');
+                     // Prikaz labela može biti dug, koristi textContent
+                     listItem.textContent = device.label || `Kamera ${device.id.substring(0, 8)}...`;
+                     listItem.dataset.cameraId = device.id;
+                     listItem.title = device.label || device.id; // Puni label u tooltipu
+
+                     // Opcionalno: Oznaci trenutno odabranu
+                     if (device.id === currentActiveCameraId) {
+                         listItem.classList.add('selected-camera');
+                     }
+
+                     // Kloniraj node da se ukloni stari listener ako postoji
+                     const newListItem = listItem.cloneNode(true);
+                     newListItem.addEventListener('click', () => {
+                         // Ovdje se poziva switchCamera koja opet zaustavlja i starta
+                         switchCamera(device.id, device.label);
+                     });
+                     cameraListUl.appendChild(newListItem);
                  });
-                 cameraListUl.appendChild(newListItem);
+
+                 cameraSelectionOverlay.style.display = 'block'; // Pokaži overlay
+
+             }).catch(err => {
+                 console.error("Greška dohvaćanja kamera za popis:", err);
+                 showTemporaryMessage(`Greška pri listanju kamera: ${err.name || err.message}`, 2500); // Pokaži i poruku greške korisniku
+                 cameraSelectionOverlay.style.display = 'none'; // Sakrij ako je greška
+                 // Pokušaj ponovno startati skener s originalnim ID-om ako se dogodi greška?
+                 // initializeScanner(); // Ovo bi moglo biti preagresivno, možda bolje ostaviti korisniku da ponovno klikne gumb
              });
-
-             cameraSelectionOverlay.style.display = 'block'; // Pokaži overlay
-
-         }).catch(err => {
-             console.error("Greška dohvaćanja kamera za popis:", err);
-             showTemporaryMessage("Greška pri listanju kamera.", 1500);
-             cameraSelectionOverlay.style.display = 'none'; // Sakrij ako je greška
-         });
+         }); // Zatvara .finally() blok
+        // *** KRAJ DODANOG DIJELA ***
     }
-
     function switchCamera(selectedCameraId, cameraLabel) {
         playSound('click-sound');
         console.log(`Odabrana kamera: ID=${selectedCameraId}, Label=${cameraLabel || 'N/A'}`);

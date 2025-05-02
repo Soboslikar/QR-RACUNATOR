@@ -543,132 +543,154 @@
     function isElementOrParentHidden(element) { if (!element) return true; while (element && element !== document.body) { if (window.getComputedStyle(element).display === 'none') return true; element = element.parentElement; } return false; }
 
     // Modificirana initializeScanner funkcija
-          async function initializeScanner() {
-        // ... (početak funkcije, dohvaćanje devices, odabir initial cameraToUse) ...
+            async function initializeScanner() { // Neka bude async da možemo koristiti await
+        if (document.body.classList.contains('history-view') || isScannerActive) return;
+        console.log("[InitializeScanner] Pokrećem...");
+        // ... (čišćenje, skrivanje elemenata) ...
 
-        let startupSuccessful = false;
-        const initialCameraId = cameraToUse.id; // Zapamti prvi ID koji smo pokušali
-        let attemptedCameraId = initialCameraId;
+        checkSharePrompt();
+        updateRunningTextVisibility();
+        updateDeactivatedIndicator();
 
-        // PRVI POKUŠAJ
-        console.log(`[InitializeScanner] Pokušavam startati prvu odabranu kameru: ${attemptedCameraId}`);
+        html5QrCodeInstance = new Html5Qrcode("reader");
+        const qrConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
+
         try {
-            await html5QrCodeInstance.start(
-                attemptedCameraId,
-                qrConfig,
-                handleScan,
-                (errorMessage) => { /* Ignoriraj non-matched QR */ }
-            );
-            console.log(`>>> [InitializeScanner] start() OK za prvu kameru: ${attemptedCameraId}`);
-            startupSuccessful = true;
-            isScannerActive = true;
-            localStorage.setItem(CAMERA_ID_KEY, attemptedCameraId);
-            console.log("Spremljen ID aktivne kamere u localStorage:", attemptedCameraId);
+            const devices = await Html5Qrcode.getCameras(); // Koristi await
+            if (!devices || devices.length === 0) {
+                throw new Error("Nema kamera.");
+            }
+            console.log("Dostupne kamere:", devices);
 
-        } catch (err) {
-            console.error(`>>> [InitializeScanner] start() FAILED za prvu kameru ${attemptedCameraId}:`, err);
+            let cameraToUse = null; // Deklariraj varijablu OVDJE
+            const savedCameraId = localStorage.getItem(CAMERA_ID_KEY);
 
-            // DRUGI POKUŠAJ (samo ako je NotReadableError i ima više kamera)
-            if (err.name === 'NotReadableError' && devices.length > 1) {
-                 console.log(`Prvo startanje neuspješno (NotReadableError). Pokušavam s alternativnom kamerom...`);
-                 // Pronađi sljedeću kameru na listi koja NIJE ova koja je failala
-                 const currentIndex = devices.findIndex(d => d.id === attemptedCameraId);
-                 const nextIndex = (currentIndex + 1) % devices.length;
-                 cameraToUse = devices[nextIndex];
-                 attemptedCameraId = cameraToUse.id; // Novi ID za pokušaj
+            // 1. Pokušaj sa spremljenom kamerom
+            if (savedCameraId) {
+                cameraToUse = devices.find(d => d.id === savedCameraId);
+                if (cameraToUse) {
+                    console.log("Pokušavam sa spremljenom kamerom:", cameraToUse.id);
+                } else {
+                    console.warn("Spremljena kamera nije pronađena, brišem iz localStorage.");
+                    localStorage.removeItem(CAMERA_ID_KEY);
+                }
+            }
 
-                 if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: orange;">Prva kamera ne radi. Pokušavam s drugom...</div>`; // Privremena poruka
+            // 2. Ako nema spremljene ili spremljena ne postoji, pokušaj naći stražnju
+            if (!cameraToUse) {
+                cameraToUse = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('zadnja') || d.label.toLowerCase().includes('environment'));
+                if (cameraToUse) {
+                    console.log("Pokušavam s pronađenom stražnjom kamerom:", cameraToUse.id);
+                } else {
+                    console.log("Nema stražnje kamere, pokušavam s prvom dostupnom:", devices[0].id);
+                    cameraToUse = devices[0]; // Dodijeli prvu dostupnu
+                }
+            }
 
-                 try {
-                    console.log(`[InitializeScanner] Pokušavam startati alternativnu kameru: ${attemptedCameraId}`);
-                    await html5QrCodeInstance.start(
-                        attemptedCameraId,
-                        qrConfig,
-                        handleScan,
-                        (errorMessage) => { /* Ignoriraj non-matched QR */ }
-                    );
-                    console.log(`>>> [InitializeScanner] start() OK za alternativnu kameru: ${attemptedCameraId}`);
-                    startupSuccessful = true;
-                    isScannerActive = true;
-                    localStorage.setItem(CAMERA_ID_KEY, attemptedCameraId); // Spremi ID USPJEŠNE alternativne kamere
-                    console.log("Spremljen ID aktivne kamere (alternativne) u localStorage:", attemptedCameraId);
+            // Osiguraj da imamo kameru za pokušaj startanja
+            if (!cameraToUse) {
+                 throw new Error("Nije bilo moguće odabrati kameru za startanje.");
+            }
 
-                 } catch (secondErr) {
-                     console.error(`>>> [InitializeScanner] start() FAILED za alternativnu kameru ${attemptedCameraId}:`, secondErr);
-                     // Oba pokušaja neuspješna
-                     isScannerActive = false;
-                     if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja kamere (${secondErr.name || secondErr.message}). Pokušajte odabrati drugu.</div>`;
+            // --- POKUŠAJI STARTANJA ---
+            let startupSuccessful = false;
+            const initialCameraId = cameraToUse.id; // Zapamti prvi ID
+            let attemptedCameraId = initialCameraId;
+
+            // PRVI POKUŠAJ
+            console.log(`[InitializeScanner] Pokušavam startati prvu odabranu kameru: ${attemptedCameraId}`);
+            try {
+                await html5QrCodeInstance.start(
+                    attemptedCameraId,
+                    qrConfig,
+                    handleScan,
+                    (errorMessage) => { /* Ignoriraj non-matched QR */ }
+                );
+                console.log(`>>> [InitializeScanner] start() OK za prvu kameru: ${attemptedCameraId}`);
+                startupSuccessful = true;
+                isScannerActive = true;
+                localStorage.setItem(CAMERA_ID_KEY, attemptedCameraId);
+                console.log("Spremljen ID aktivne kamere u localStorage:", attemptedCameraId);
+
+            } catch (err) {
+                console.error(`>>> [InitializeScanner] start() FAILED za prvu kameru ${attemptedCameraId}:`, err);
+
+                // DRUGI POKUŠAJ (samo ako je NotReadableError i ima više kamera)
+                if (err.name === 'NotReadableError' && devices.length > 1) {
+                     console.log(`Prvo startanje neuspješno (NotReadableError). Pokušavam s alternativnom kamerom...`);
+                     // Pronađi sljedeću kameru na listi koja NIJE ova koja je failala
+                     const currentIndex = devices.findIndex(d => d.id === initialCameraId); // Traži po ORIGINALNOM ID-u
+                     // Osiguraj da nextIndex nije isti kao currentIndex, kružno
+                     let nextIndex = (currentIndex + 1) % devices.length;
+                     while (devices[nextIndex].id === initialCameraId && devices.length > 1) {
+                         nextIndex = (nextIndex + 1) % devices.length;
+                         if (nextIndex === currentIndex) break; // Spriječi beskonačnu petlju ako je samo jedna kamera ili sve failaju s istim ID-om? (Trebalo bi biti pokriveno s devices.length > 1)
+                     }
+
+                     cameraToUse = devices[nextIndex]; // Nova kamera za pokušaj
+                     attemptedCameraId = cameraToUse.id;
+
+                     if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: orange;">Prva kamera ne radi. Pokušavam s drugom...</div>`; // Privremena poruka
+
+                     try {
+                        console.log(`[InitializeScanner] Pokušavam startati alternativnu kameru: ${attemptedCameraId}`);
+                        await html5QrCodeInstance.start(
+                            attemptedCameraId,
+                            qrConfig,
+                            handleScan,
+                            (errorMessage) => { /* Ignoriraj non-matched QR */ }
+                        );
+                        console.log(`>>> [InitializeScanner] start() OK za alternativnu kameru: ${attemptedCameraId}`);
+                        startupSuccessful = true;
+                        isScannerActive = true;
+                        localStorage.setItem(CAMERA_ID_KEY, attemptedCameraId); // Spremi ID USPJEŠNE alternativne kamere
+                        console.log("Spremljen ID aktivne kamere (alternativne) u localStorage:", attemptedCameraId);
+
+                     } catch (secondErr) {
+                         console.error(`>>> [InitializeScanner] start() FAILED za alternativnu kameru ${attemptedCameraId}:`, secondErr);
+                         // Oba pokušaja neuspješna
+                         isScannerActive = false;
+                         if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja kamere (${secondErr.name || secondErr.message}). Pokušajte odabrati drugu.</div>`;
+                         if (switchCameraButton && devices.length > 1) {
+                             switchCameraButton.style.display = 'block';
+                        }
+                     }
+
+                } else {
+                    // Prvi pokušaj neuspješan, ali nije NotReadableError ili nema alternative
+                    isScannerActive = false;
+                     if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja kamere (${err.name || err.message}). Pokušajte odabrati drugu.</div>`;
                      if (switchCameraButton && devices.length > 1) {
                          switchCameraButton.style.display = 'block';
                     }
-                 }
+                }
+            } // Kraj catch za prvi pokušaj
 
+            // Prikaz UI elemenata nakon uspješnog startanja (ili neuspjeha)
+            if (startupSuccessful) {
+                 // Ovdje ide sav kod koji je bio unutar .then() bloka stare funkcije
+                  setTimeout(() => {
+                    console.log("[InitializeScanner][then-delay] Prikazujem uputu i vežem listener.");
+                    if (instructionDiv && document.body.classList.contains('scanner-view')) {
+                        instructionDiv.style.display = 'block';
+                    }
+                    if (!visibilityListenerAttached) {
+                        attachVisibilityListener();
+                    }
+                }, 100);
             } else {
-                // Prvi pokušaj neuspješan, ali nije NotReadableError ili nema alternative
-                isScannerActive = false;
-                 if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja kamere (${err.name || err.message}). Pokušajte odabrati drugu.</div>`;
-                 if (switchCameraButton && devices.length > 1) {
-                     switchCameraButton.style.display = 'block';
-                }
+                 console.error("[InitializeScanner] Nijedan pokušaj startanja kamere nije bio uspješan.");
+                 html5QrCodeInstance = null; // Nulliraj instancu ako na kraju ne uspije startati
             }
-        } // Kraj catch za prvi pokušaj
 
-        // Prikaz UI elemenata nakon uspješnog startanja (ili neuspjeha)
-        if (startupSuccessful) {
-             // Ovdje ide sav kod koji je bio unutar .then() bloka stare funkcije
-              setTimeout(() => {
-                console.log("[InitializeScanner][then-delay] Prikazujem uputu i vežem listener.");
-                if (instructionDiv && document.body.classList.contains('scanner-view')) {
-                    instructionDiv.style.display = 'block';
-                }
-                if (!visibilityListenerAttached) {
-                    attachVisibilityListener();
-                }
-            }, 100);
-        } else {
-             // Ovdje ide cleanup ili dodatne poruke ako nijedan pokušaj nije uspio
-             html5QrCodeInstance = null; // Nulliraj instancu ako na kraju ne uspije startati
-        }
-    };
-   
-    // Modificirana stopScanner funkcija
-    function stopScanner() {
-        if(runningTextContainer) runningTextContainer.style.display = 'none';
-        if(sharePromptOverlay) sharePromptOverlay.style.display = 'none';
-        if(counterDeactivatedIndicator) counterDeactivatedIndicator.style.display = 'none';
-        if(switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb kad se skener gasi
-        if(cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij i overlay
 
-        const instanceToStop = html5QrCodeInstance;
-        if (instanceToStop && isScannerActive) {
-            console.log("Zaustavljam skener...");
-            isScannerActive = false; // Postavi na false PRIJE poziva stop()
+        } catch (err) {
+            console.error("Greška dohvaćanja kamera ili inicijalizacije:", err);
+            isScannerActive = false;
+            if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška pristupa kamerama (${err.name || err}). Provjerite dozvole.</div>`;
             if (instructionDiv) instructionDiv.style.display = 'none';
-
-            // *** DODAJ OVAJ DIO ***
-            // Obriši spremljeni ID kamere pri zaustavljanju - rješenje za problem na A33
-            try {
-                localStorage.removeItem(CAMERA_ID_KEY);
-                console.log("Spremljen ID kamere obrisan iz localStorage pri zaustavljanju.");
-            } catch (e) {
-                console.error("Greška pri brisanju CAMERA_ID_KEY iz localStorage:", e);
-            }
-            // *********************
-
-            return instanceToStop.stop().then(() => {
-                console.log("Skener uspješno zaustavljen.");
-                if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz
-            }).catch(err => {
-                console.warn("Greška pri zaustavljanju skenera (možda već bio zaustavljen):", err);
-                if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz svejedno
-            }).finally(() => {
-                // Ovdje NE NULLIRAMO html5QrCodeInstance, jer bi nam trebao za startanje kasnije
-            });
-        } else {
-             console.log("Skener nije aktivan ili instanca ne postoji, nema potrebe za zaustavljanjem.");
-             isScannerActive = false; // Osiguraj da je false
-             if (readerDiv) readerDiv.innerHTML = ''; // Očisti za svaki slučaj
-             return Promise.resolve(); // Vrati resolved promise
+            if (switchCameraButton) switchCameraButton.style.display = 'none';
+            html5QrCodeInstance = null;
         }
     };
        function toggleCameraSelection() {

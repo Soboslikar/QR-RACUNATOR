@@ -661,6 +661,7 @@
         });
     };
 
+   
     // Modificirana stopScanner funkcija
     function stopScanner() {
         if(runningTextContainer) runningTextContainer.style.display = 'none';
@@ -675,6 +676,16 @@
             isScannerActive = false; // Postavi na false PRIJE poziva stop()
             if (instructionDiv) instructionDiv.style.display = 'none';
 
+            // *** DODAJ OVAJ DIO ***
+            // Obriši spremljeni ID kamere pri zaustavljanju - rješenje za problem na A33
+            try {
+                localStorage.removeItem(CAMERA_ID_KEY);
+                console.log("Spremljen ID kamere obrisan iz localStorage pri zaustavljanju.");
+            } catch (e) {
+                console.error("Greška pri brisanju CAMERA_ID_KEY iz localStorage:", e);
+            }
+            // *********************
+
             return instanceToStop.stop().then(() => {
                 console.log("Skener uspješno zaustavljen.");
                 if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz
@@ -682,7 +693,7 @@
                 console.warn("Greška pri zaustavljanju skenera (možda već bio zaustavljen):", err);
                 if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz svejedno
             }).finally(() => {
-                // Ne treba nullirati html5QrCodeInstance ovdje
+                // Ovdje NE NULLIRAMO html5QrCodeInstance, jer bi nam trebao za startanje kasnije
             });
         } else {
              console.log("Skener nije aktivan ili instanca ne postoji, nema potrebe za zaustavljanjem.");
@@ -691,7 +702,6 @@
              return Promise.resolve(); // Vrati resolved promise
         }
     };
-
        function toggleCameraSelection() {
          playSound('click-sound');
          if (!cameraSelectionOverlay || !cameraListUl || !switchCameraButton) return;

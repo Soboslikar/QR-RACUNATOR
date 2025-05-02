@@ -258,7 +258,7 @@
     const COUNTER2_KEY = 'qrCalculatorCounter2';
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec';
-    const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // NOVI KLJUČ
+    const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID';
 
     let ukupno = 0;
     let povijest = [];
@@ -538,17 +538,79 @@
         }
     }
 
+
     // *** FUNKCIJE ZA UPRAVLJANJE SKENEROM ***
+    // Postavljene OVDJE PRIJE funkcija koje ih pozivaju (toggleCameraSelection, switchCamera, handleVisibilityChange, switchToScannerView)
 
     function isElementOrParentHidden(element) { if (!element) return true; while (element && element !== document.body) { if (window.getComputedStyle(element).display === 'none') return true; element = element.parentElement; } return false; }
 
-    // Modificirana initializeScanner funkcija s pokušajem alternativne kamere
+
+    // Modificirana stopScanner funkcija (dodano brisanje localStorage)
+    function stopScanner() {
+        console.log("[stopScanner] Pokrenuto.");
+        if(runningTextContainer) runningTextContainer.style.display = 'none';
+        if(sharePromptOverlay) sharePromptOverlay.style.display = 'none';
+        if(counterDeactivatedIndicator) counterDeactivatedIndicator.style.display = 'none';
+        if(switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb kad se skener gasi
+        if(cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij i overlay
+
+        const instanceToStop = html5QrCodeInstance;
+        // Zaustavi samo ako instanca postoji I skener je bio aktivan
+        if (instanceToStop && isScannerActive) {
+            console.log("[stopScanner] Zaustavljam skener (isScannerActive je bio true)...");
+            isScannerActive = false; // Postavi na false PRIJE poziva stop()
+            if (instructionDiv) instructionDiv.style.display = 'none';
+
+            // *** DODANO: Obriši spremljeni ID kamere pri uspješnom zaustavljanju ***
+            // Brišemo ID SADA, prije poziva stop()
+            // Ovo osigurava da se pri sljedećem initialize() krene od nule (stražnja/prva)
+            // ako je skener zaista bio aktivan.
+             try {
+                 const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY);
+                 if (currentActiveCameraId) {
+                    localStorage.removeItem(CAMERA_ID_KEY);
+                    console.log("[stopScanner] Spremljen ID kamere obrisan iz localStorage.");
+                 } else {
+                     console.log("[stopScanner] Nema spremljenog ID-a kamere za brisanje.");
+                 }
+            } catch (e) {
+                console.error("[stopScanner] Greška pri brisanju CAMERA_ID_KEY iz localStorage:", e);
+            }
+            // *********************
+
+
+            return instanceToStop.stop().then(() => {
+                console.log("[stopScanner] Skener uspješno zaustavljen (stop().then()).");
+                 // Očisti prikaz SAMO ako je stop bio uspješan
+                if (readerDiv) readerDiv.innerHTML = '';
+            }).catch(err => {
+                console.warn("[stopScanner] Greška pri zaustavljanju skenera (stop().catch()):", err);
+                 // Očisti prikaz i ako je greška pri stop()
+                 if (readerDiv) readerDiv.innerHTML = '';
+            }).finally(() => {
+                console.log("[stopScanner] finally blok završen.");
+                // html5QrCodeInstance NE NULLIRAMO ovdje
+            });
+        } else {
+             console.log("[stopScanner] Skener nije bio aktivan ili instanca ne postoji. Nema potrebe za zaustavljanjem.");
+             isScannerActive = false; // Osiguraj da je false
+             if (readerDiv) readerDiv.innerHTML = ''; // Očisti za svaki slučaj
+             // Nema ID-a za brisanje jer skener nije bio aktivan
+             return Promise.resolve(); // Vrati resolved promise
+        }
+    };
+
+
+    // Nova async initializeScanner funkcija s pokušajem alternativne kamere
     async function initializeScanner() {
         console.log("[InitializeScanner] Pokrećem...");
-        if (document.body.classList.contains('history-view') || isScannerActive) {
-            console.log("[InitializeScanner] Odustajem (history view ili već aktivan).");
-            return;
+        // Prekini ako smo već u history view ili je skener već aktivan
+        if (document.body.classList.contains('history-view')) {
+             console.log("[InitializeScanner] Odustajem (history view).");
+             return;
         }
+         // Provjeravamo isScannerActive kasniej, nakon getCameras
+
         if (readerDiv) readerDiv.innerHTML = ''; // Očisti prethodne poruke/video
         if (instructionDiv) instructionDiv.style.display = 'none'; // Sakrij uputu dok se ne pokrene
         if (switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb dok kamera ne radi
@@ -575,16 +637,31 @@
             }
             console.log("Dostupne kamere:", devices);
 
+            // Provjeri je li skener već aktivan NAKON što smo dobili listu kamera
+             // (ovo je bitno za handleVisibilityChange, da ne re-inicijalizira ako već radi)
+            if (isScannerActive) {
+                 console.log("[InitializeScanner] Odustajem (isScannerActive je true nakon getCameras).");
+                 // Pokaži gumb ako treba
+                 if (switchCameraButton && devices.length > 1) {
+                    switchCameraButton.style.display = 'block';
+                 }
+                 // Prikaz upute itd.
+                 if (instructionDiv && document.body.classList.contains('scanner-view')) {
+                     instructionDiv.style.display = 'block';
+                 }
+                 return; // Prekini ako je već aktivan
+            }
+
             if (isElementOrParentHidden(readerDiv)) {
                 if (readerDiv) readerDiv.innerHTML = '<div style="padding:20px; color: red;">Greška: Reader skriven.</div>';
                 console.error("[InitializeScanner] Reader je skriven.");
-                isScannerActive = false; // Osiguraj da je false
-                 if (switchCameraButton && devices.length > 1) { // Pokaži gumb ako ima više kamera čak i kad reader skriven
+                 // Pokaži gumb ako ima više kamera čak i kad reader skriven
+                 if (switchCameraButton && devices.length > 1) {
                     switchCameraButton.style.display = 'block';
                 }
+                isScannerActive = false; // Osiguraj da je false
                 return; // Prekini inicijalizaciju ako je reader skriven
             }
-
 
             let cameraToUse = null; // Varijabla za kameru koju ćemo pokušati startati
             const savedCameraId = localStorage.getItem(CAMERA_ID_KEY); // Dohvati spremljeni ID
@@ -594,7 +671,7 @@
                 const foundDevice = devices.find(d => d.id === savedCameraId);
                 if (foundDevice) {
                     cameraToUse = foundDevice;
-                    console.log("Prvi pokušaj sa spremljenom kamerom:", cameraToUse.id);
+                    console.log("Prvi pokušaj: Koristim spremljenu kameru:", cameraToUse.id);
                 } else {
                     console.warn("Spremljena kamera ID nije pronađen na listi, brišem iz localStorage.");
                     localStorage.removeItem(CAMERA_ID_KEY); // Obriši ako spremljena kamera ne postoji više
@@ -606,11 +683,11 @@
                  const rearCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('zadnja') || d.label.toLowerCase().includes('environment'));
                  if (rearCamera) {
                      cameraToUse = rearCamera;
-                     console.log("Prvi pokušaj s pronađenom stražnjom kamerom:", cameraToUse.id);
+                     console.log("Prvi pokušaj: Koristim pronađenu stražnju kameru:", cameraToUse.id);
                  } else {
                      // 3. Ako nema stražnje, koristi prvu dostupnu
                      cameraToUse = devices[0];
-                     console.log("Nema stražnje kamere, prvi pokušaj s prvom dostupnom:", cameraToUse.id);
+                     console.log("Prvi pokušaj: Nema stražnje kamere, koristim prvu dostupnu:", cameraToUse.id);
                  }
             }
 
@@ -622,52 +699,37 @@
 
             // --- POKUŠAJI STARTANJA ---
             let startupSuccessful = false;
-            const initialCameraId = cameraToUse.id; // Zapamti ID prve kamere koju pokušavamo
+            const firstAttemptCamera = cameraToUse; // Ovo je kamera koju prvu probamo
 
             // PRVI POKUŠAJ
-            console.log(`[InitializeScanner] Pokušavam startati PRVU odabranu kameru: ${initialCameraId}`);
+            console.log(`[InitializeScanner] Pokušavam startati PRVU odabranu kameru: ${firstAttemptCamera.id}`);
             try {
                 await html5QrCodeInstance.start( // Koristi await
-                    initialCameraId,
+                    firstAttemptCamera.id,
                     qrConfig,
                     handleScan,
                     (errorMessage) => { /* Ignoriraj non-matched QR */ }
                 );
-                console.log(`>>> [InitializeScanner] start() OK za PRVU kameru: ${initialCameraId}`);
+                console.log(`>>> [InitializeScanner] start() OK za PRVU kameru: ${firstAttemptCamera.id}`);
                 startupSuccessful = true;
                 isScannerActive = true;
-                localStorage.setItem(CAMERA_ID_KEY, initialCameraId); // Spremi ID USPJEŠNO pokrenute kamere
-                console.log("Spremljen ID aktivne kamere u localStorage:", initialCameraId);
+                localStorage.setItem(CAMERA_ID_KEY, firstAttemptCamera.id); // Spremi ID USPJEŠNO pokrenute kamere
+                console.log("Spremljen ID aktivne kamere u localStorage:", firstAttemptCamera.id);
 
             } catch (err) {
-                console.error(`>>> [InitializeScanner] start() FAILED za PRVU kameru ${initialCameraId}:`, err);
+                console.error(`>>> [InitializeScanner] start() FAILED za PRVU kameru ${firstAttemptCamera.id}:`, err);
 
                 // DRUGI POKUŠAJ (samo ako je NotReadableError i ima više od jedne kamere)
                 if (err.name === 'NotReadableError' && devices.length > 1) {
-                     console.log(`Prvo startanje neuspješno (NotReadableError). Pokušavam s DRUGOM kamerom...`);
-                     // Pronađi sljedeću kameru na listi koja NIJE ova koja je failala
-                     const currentIndex = devices.findIndex(d => d.id === initialCameraId);
-                     // Odaberi sljedeću kameru u listi, kružno (ali pazi da nije opet ista ako ima samo 2 kamere iste vrste npr.)
-                     let nextIndex = (currentIndex + 1) % devices.length;
-                     let secondAttemptCamera = devices[nextIndex];
+                     console.log(`Prvo startanje neuspješno (${err.name}). Pokušavam s DRUGOM kamerom...`);
 
-                     // Mala sigurnosna provjera: ako je sljedeća kamera ista kao prva, a ima više od 2 kamere, probaj treću
-                     // Ovo se događa npr. ako imate 2 identične stražnje kamere i prva (koju smo našli po labelu) faila,
-                     // a sljedeća u nizu je druga identična stražnja.
-                     if (secondAttemptCamera.id === initialCameraId && devices.length > 2) {
-                          nextIndex = (nextIndex + 1) % devices.length;
-                          secondAttemptCamera = devices[nextIndex];
-                           console.log("Preskačem identičnu kameru, pokušavam s trećom na listi:", secondAttemptCamera.id);
-                     } else if (secondAttemptCamera.id === initialCameraId) {
-                         // Ako ima samo 2 kamere i druga je ista kao prva, nema smisla pokušavati.
-                         console.warn("Alternativna kamera je ista kao i prva, a nema drugih opcija. Odustajem od drugog pokušaja.");
-                         secondAttemptCamera = null; // Ne pokušavaj drugi put
-                     }
-
+                     // Pronađi prvu kameru na listi koja NIJE ID prve pokušane kamere
+                     let secondAttemptCamera = devices.find(d => d.id !== firstAttemptCamera.id);
 
                      if (secondAttemptCamera) {
                         if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: orange;">Greška s prvom kamerom. Pokušavam s drugom...</div>`; // Privremena poruka
 
+                        console.log(`[InitializeScanner] Pokušavam startati DRUGU odabranu kameru: ${secondAttemptCamera.id}`);
                         try {
                             await html5QrCodeInstance.start(
                                 secondAttemptCamera.id,
@@ -684,37 +746,39 @@
                         } catch (secondErr) {
                             console.error(`>>> [InitializeScanner] start() FAILED za DRUGU kameru ${secondAttemptCamera.id}:`, secondErr);
                             // Oba pokušaja neuspješna
-                            isScannerActive = false;
+                            isScannerActive = false; // Ensure false
                             if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja kamere (${secondErr.name || secondErr.message}). Pokušajte odabrati drugu.</div>`;
-                            if (switchCameraButton && devices.length > 1) { // Pokaži gumb i ako faila, da mogu probati drugu
-                                switchCameraButton.style.display = 'block';
-                            }
+                            // Pokaži gumb ako ima više kamera i oba pokušaja su failala
+                            if (switchCameraButton && devices.length > 1) { switchCameraButton.style.display = 'block'; }
+                             html5QrCodeInstance = null; // Nulliraj instancu ako na kraju ne uspije startati
                         }
                      } else {
-                         // Nije pronađena smislena alternativna kamera za pokušaj
-                        isScannerActive = false;
-                        if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja prve kamere (${err.name || err.message}). Nema alternativnih opcija. Pokušajte odabrati drugu.</div>`;
-                        if (switchCameraButton && devices.length > 1) { // Pokaži gumb i ako faila, da mogu probati drugu
-                             switchCameraButton.style.display = 'block';
-                        }
+                         // NotReadableError na prvoj, ali nema smislene alternative na listi (npr. samo jedna kamera ili sve imaju isti ID)
+                         console.warn("Prva kamera neuspješna, ali nije pronađena smislena alternativna kamera na listi. Odustajem od drugog pokušaja.");
+                         isScannerActive = false;
+                         if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja prve kamere (${err.name || err.message}). Nema alternativnih opcija. Pokušajte odabrati drugu.</div>`;
+                         if (switchCameraButton && devices.length > 1) { switchCameraButton.style.display = 'block'; }
+                          html5QrCodeInstance = null; // Nulliraj instancu ako na kraju ne uspije startati
                      }
-
 
                 } else {
                     // Prvi pokušaj neuspješan, ali NIJE NotReadableError ili nema više od jedne kamere
+                    console.error(`Prvi pokušaj neuspješna (${err.name}). Nije NotReadableError ili nema alternativnih kamera.`);
                     isScannerActive = false;
                      if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška startanja kamere (${err.name || err.message}). Pokušajte odabrati drugu.</div>`;
                      if (switchCameraButton && devices.length > 1) {
                          switchCameraButton.style.display = 'block';
                     }
+                     html5QrCodeInstance = null; // Nulliraj instancu ako na kraju ne uspije startati
                 }
             } // Kraj catch za prvi pokušaj
 
             // --- KRAJ POKUŠAJA ---
 
-            // Prikaz UI elemenata nakon uspješnog startanja (ili neuspjeha)
+            // Prikaz UI elemenata nakon uspješnog startanja
             if (startupSuccessful) {
-                 // Pokaži gumb za promjenu tek kad je kamera uspješno startala
+                 console.log("[InitializeScanner] Skener uspješno startan.");
+                 // Pokaži gumb za promjenu tek kad je kamera uspješno startala I ima više od jedne kamere
                  if (switchCameraButton && devices.length > 1) {
                      switchCameraButton.style.display = 'block';
                  }
@@ -728,66 +792,20 @@
                     }
                 }, 100);
             } else {
-                 console.error("[InitializeScanner] Nijedan pokušaj startanja kamere nije bio uspješan.");
-                 html5QrCodeInstance = null; // Nulliraj instancu ako na kraju ne uspije startati
+                 // Ako nijedan pokušaj nije uspio, odgovarajuće poruke i gumbi su već prikazani u catch blokovima.
+                 // html5QrCodeInstance je već nulliran ako je bilo greške.
+                 console.error("[InitializeScanner] Nijedan pokušaj startanja kamere nije bio uspješan na kraju funkcije.");
             }
 
+
         } catch (err) {
-            console.error("Greška dohvaćanja kamera ili inicijalizacije:", err);
+            // Greška pri getCameras()
+            console.error("Greška dohvaćanja kamera ili inicijalizacije Html5Qrcode:", err);
             isScannerActive = false;
-            if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška pristupa kamerama (${err.name || err}). Provjerite dozvole.</div>`;
+            if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška pristupa kamerama (${err.name || err.message}). Provjerite dozvole.</div>`;
             if (instructionDiv) instructionDiv.style.display = 'none';
             if (switchCameraButton) switchCameraButton.style.display = 'none'; // Nema kamera, nema gumba za promjenu
             html5QrCodeInstance = null; // Nulliraj instancu jer nije bilo kamera
-        }
-    };
-
-    // Modificirana stopScanner funkcija (dodano brisanje localStorage)
-    function stopScanner() {
-        console.log("[stopScanner] Pokrenuto.");
-        if(runningTextContainer) runningTextContainer.style.display = 'none';
-        if(sharePromptOverlay) sharePromptOverlay.style.display = 'none';
-        if(counterDeactivatedIndicator) counterDeactivatedIndicator.style.display = 'none';
-        if(switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb kad se skener gasi
-        if(cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij i overlay
-
-        const instanceToStop = html5QrCodeInstance;
-        if (instanceToStop && isScannerActive) {
-            console.log("[stopScanner] Zaustavljam skener...");
-            isScannerActive = false; // Postavi na false PRIJE poziva stop()
-            if (instructionDiv) instructionDiv.style.display = 'none';
-
-             // *** DODANO: Obriši spremljeni ID kamere pri zaustavljanju ***
-            try {
-                 const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY);
-                 if (currentActiveCameraId) {
-                    localStorage.removeItem(CAMERA_ID_KEY);
-                    console.log("[stopScanner] Spremljen ID kamere obrisan iz localStorage.");
-                 } else {
-                     console.log("[stopScanner] Nema spremljenog ID-a kamere za brisanje.");
-                 }
-            } catch (e) {
-                console.error("[stopScanner] Greška pri brisanju CAMERA_ID_KEY iz localStorage:", e);
-            }
-            // *********************
-
-            return instanceToStop.stop().then(() => {
-                console.log("[stopScanner] Skener uspješno zaustavljen.");
-                if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz
-            }).catch(err => {
-                console.warn("[stopScanner] Greška pri zaustavljanju skenera (možda već bio zaustavljen ili drugi problem):", err);
-                 // Unatoč grešci pri stop(), možda treba obrisati ID ako nismo uspjeli prije?
-                 // Ne, brisanje ID-a je premješteno gore da se obriše samo ako je isScannerActive bio true.
-                 if (readerDiv) readerDiv.innerHTML = ''; // Očisti prikaz svejedno
-            }).finally(() => {
-                console.log("[stopScanner] finally blok završen.");
-                // html5QrCodeInstance NE NULLIRAMO ovdje
-            });
-        } else {
-             console.log("[stopScanner] Skener nije aktivan ili instanca ne postoji, nema potrebe za zaustavljanjem.");
-             isScannerActive = false; // Osiguraj da je false
-             if (readerDiv) readerDiv.innerHTML = ''; // Očisti za svaki slučaj
-             return Promise.resolve(); // Vrati resolved promise
         }
     };
 
@@ -808,11 +826,11 @@
          }
 
          // Inače, dohvati kamere i prikaži ih
-         // Prvo zaustavi skener prije dohvaćanja liste (zbog A33 problema)
+         // Prvo zaustavi skener prije dohvaćanja liste (zbog A33 problema pri listanju dok je kamera aktivna)
          console.log("[toggleCameraSelection] Pokušavam zaustaviti skener prije listanja kamera.");
          // Koristimo then/catch/finally na Promise-u koji vraca stopScanner()
          stopScanner().finally(() => {
-             console.log("[toggleCameraSelection] Skener zaustavljen (ili nije bio aktivan). Dohvaćam kamere...");
+             console.log("[toggleCameraSelection] Skener zaustavljen (ili nije bio aktivan). Dohvaćam kamere za listu...");
              Html5Qrcode.getCameras().then(devices => {
                  if (!devices || devices.length === 0) {
                      showTemporaryMessage("Nema dostupnih kamera.", 1500);
@@ -821,12 +839,9 @@
                  }
 
                  cameraListUl.innerHTML = ''; // Očisti prethodni popis
-                 // Dohvati ID *trenutno* aktivne kamere iz localStorage (ako postoji) da je označimo
-                 // Imajte na umu da je CAMERA_ID_KEY obrisan pri stopiranju,
-                 // pa će currentActiveCameraId biti null ako je skener bio uspješno zaustavljen.
-                 // To je OK, jer ćemo označiti kameru koja će biti startana PRI sljedećem pokretanju
-                 // (defaultnu ili onu koju korisnik odabere).
+                 // Dohvati ID *trenutno* odabrane kamere iz localStorage (može biti null ako je obrisan pri stop())
                  const currentSelectedCameraId = localStorage.getItem(CAMERA_ID_KEY);
+                 console.log("[toggleCameraSelection] Trenutno spremljen CAMERA_ID_KEY:", currentSelectedCameraId);
 
                  devices.forEach(device => {
                      const listItem = document.createElement('li');
@@ -834,34 +849,29 @@
                      listItem.dataset.cameraId = device.id;
                      listItem.title = device.label || device.id;
 
-                     // Oznaci kameru koja će biti startana next (spremljena ili defaultna)
-                     // Na A33, ovo će vjerojatno označiti defaultnu stražnju kameru, čak i ako je ona problematična
-                     if (device.id === currentSelectedCameraId) {
-                         listItem.classList.add('selected-camera');
-                     } else if (!currentSelectedCameraId && (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('zadnja') || device.label.toLowerCase().includes('environment'))) {
-                          // Ako nema spremljenog ID-a, a ovo je stražnja, označi nju kao default
-                         listItem.classList.add('selected-camera');
+                     // Oznaci kameru koja će biti startana pri sljedećem initialize()
+                     // To je spremljena kamera (ako postoji) ili defaultna (stražnja/prva)
+                     if (currentSelectedCameraId && device.id === currentSelectedCameraId) {
+                          listItem.classList.add('selected-camera');
+                          console.log(`[toggleCameraSelection] Označavam kameru ${device.id} (spremljena).`);
+                     } else if (!currentSelectedCameraId) {
+                         // Ako nema spremljenog ID-a, pokušaj označiti defaultnu (stražnju ili prvu)
+                         // Ovo je malo grubo, ali vizualno pomaže korisniku
+                         const isRear = device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('zadnja') || device.label.toLowerCase().includes('environment');
+                         const isFirst = device.id === devices[0].id;
+                         // Označi kao defaultnu prvu na listi koja je stražnja, ILI prvu na listi ako nema stražnjih
+                         if ((isRear && !devices.some(d => d.id !== device.id && (d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('zadnja') || d.label.toLowerCase().includes('environment')))) || (!devices.some(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('zadnja') || d.label.toLowerCase().includes('environment')) && isFirst)) {
+                              listItem.classList.add('selected-camera');
+                               console.log(`[toggleCameraSelection] Označavam kameru ${device.id} (defaultna).`);
+                         }
                      }
 
 
                      const newListItem = listItem.cloneNode(true);
                      newListItem.addEventListener('click', () => {
-                         //switchCamera(device.id, device.label); // <- switchCamera sada poziva stop/start unutra
-                         // Budući da smo skener već zaustavili u toggleCameraSelection,
-                         // možda možemo direktno spremiti ID i pozvati initialize?
-                         // NE, switchCamera ima logiku provjere je li ista kamera odabrana,
-                         // bolje koristiti nju. Ali nju treba također modificirati.
-                         // Ili neka switchCamera jednostavno postavi ID i pozove initialize...
-                         // Da, switchCamera je bolji wrapper.
-
-                         // Spremi odabrani ID u localStorage PRIJE poziva switchCamera
-                         localStorage.setItem(CAMERA_ID_KEY, device.id);
-                         console.log("[toggleCameraSelection] Odabrana kamera spremljena:", device.id);
-
-                         // Pozovi switchCamera, koja će zaustaviti (ako treba) i startati initialize
+                         // Kada korisnik odabere kameru s liste, pozovi switchCamera
                          switchCamera(device.id, device.label);
-
-                         // Sakrij overlay ODMAH nakon klika
+                         // Sakrij overlay ODMAH nakon klika unutar listenerea
                          if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none';
                      });
                      cameraListUl.appendChild(newListItem);
@@ -874,9 +884,6 @@
                  console.error("[toggleCameraSelection] Greška dohvaćanja kamera za popis:", err);
                  showTemporaryMessage(`Greška pri listanju kamera: ${err.name || err.message}`, 2500);
                  cameraSelectionOverlay.style.display = 'none';
-                 // Nakon greške pri listanju, ponovno pokreni skener (ako je bio aktivan prije zaustavljanja)?
-                 // initializeScanner(); // Ovo bi moglo stvoriti petlju ako getCameras() uvijek faila.
-                 // Bolje ne, neka korisnik proba ponovo kliknuti ili osvježiti.
              });
          });
     }
@@ -884,21 +891,22 @@
     // Modificirana switchCamera funkcija (postavlja samo ID i poziva initialize)
     function switchCamera(selectedCameraId, cameraLabel) {
         playSound('click-sound');
-        console.log(`[switchCamera] Odabrana kamera: ID=${selectedCameraId}, Label=${cameraLabel || 'N/A'}`);
+        console.log(`[switchCamera] Odabrana kamera: ID=${selectedCameraId}, Label=${cameraLabel || 'N/A'}. Pokušavam prebaciti...`);
 
         if (cameraSelectionOverlay) {
-             cameraSelectionOverlay.style.display = 'none'; // Sakrij popis
+             cameraSelectionOverlay.style.display = 'none'; // Sakrij popis (radi se i u click handleru liste, ali neka ostane i ovdje)
         }
 
-        // Spremi novi odabir - OVO SE RADI VEĆ U toggleCameraSelection klik handleru
-        // localStorage.setItem(CAMERA_ID_KEY, selectedCameraId);
+        // Spremi novi odabrani ID u localStorage. initializeScanner() će ga pročitati.
+        localStorage.setItem(CAMERA_ID_KEY, selectedCameraId);
+        console.log("[switchCamera] Spremljen novi CAMERA_ID_KEY:", selectedCameraId);
 
-        // Restartaj skener
+
+        // Restartaj skener. initializeScanner() će pročitati novi ID.
         showTemporaryMessage(`Mijenjam na: ${cameraLabel || 'Kamera'}...`, 1000);
-        // Nema potrebe za stopScanner().finally(initializeScanner) ovdje,
-        // jer toggleCameraSelection() već poziva stopScanner() prije otvaranja liste,
-        // i initializeScanner() se brine za zaustavljanje ako je već aktivan.
-        // Samo pozovi initializeScanner() koji će pročitati novi CAMERA_ID_KEY
+        // Nema potrebe za stopScanner().finally(initializeScanner) ovdje.
+        // initializeScanner() se brine za zaustavljanje ako je već aktivan
+        // i sada se brine za pokušaje startanja.
         initializeScanner();
     }
 
@@ -907,22 +915,24 @@
         console.log("switchToScannerView: Pokrenuto.");
         if (document.body.classList.contains('scanner-view')) {
             console.log("switchToScannerView: Već u scanner view.");
+            // Ako smo već u scanner viewu, a skener nije aktivan, pokušaj ga inicijalizirati
             if (!isScannerActive) {
                 console.log("switchToScannerView: Skener nije aktivan, inicijaliziram...");
                 initializeScanner();
             } else {
                  console.log("switchToScannerView: Skener je već aktivan, samo ažuriram UI.");
+                 // Ažuriraj UI elemente specifične za skener (mogu biti skriveni u history viewu)
                  checkSharePrompt();
                  updateRunningTextVisibility();
                  updateDeactivatedIndicator();
-                 // Pokaži gumb ako treba (async poziv jer getCameras() je async)
+                 // Pokaži gumb za promjenu kamere ako treba (async poziv jer getCameras() je async)
                  Html5Qrcode.getCameras().then(devices => {
                      if (switchCameraButton && isScannerActive && devices && devices.length > 1) {
                         switchCameraButton.style.display = 'block';
                      }
                  }).catch(()=>{/* ignore error */});
             }
-            return;
+            return; // Završi funkciju ako smo već u tom viewu
         }
 
         // Resetiraj confirmation gumbe iz history view-a
@@ -931,29 +941,31 @@
         const clearDayBtn = document.getElementById('clear-day-btn'); if (clearDayBtn && clearDayBtn.dataset.confirming === 'true') { clearDayBtn.innerText = "IZBRIŠI OVAJ DAN"; clearDayBtn.classList.remove('confirm-mode'); clearDayBtn.dataset.confirming = 'false'; }
         if (historyDynamicHeaderContentDiv) historyDynamicHeaderContentDiv.innerHTML = ''; // Očisti header povijesti
 
+        // Promijeni klase na body elementu
         document.body.classList.remove('history-view');
         document.body.classList.add('scanner-view');
-        document.body.style.backgroundColor = '#f4f4f4';
+        document.body.style.backgroundColor = '#f4f4f4'; // Postavi pozadinu za scanner view
 
+        // Resetiraj stanje prikaza povijesti
         currentlyViewedDate = new Date(); currentlyViewedDate.setHours(0, 0, 0, 0);
         previousHistoryViewState = 'day-view';
 
         updateDisplay(); // Ažuriraj prikaz (ukupno, broj računa itd.)
 
-        // Pokreni inicijalizaciju skenera NAKON promjene view-a
+        // Pokreni inicijalizaciju skenera NAKON promjene view-a (koristi requestAnimationFrame za sigurnost)
         requestAnimationFrame(initializeScanner);
 
-        // Attach visibility listener ako već nije
+        // Attach visibility listener ako već nije (bitno za pauziranje/nastavak skeniranja)
         if (!visibilityListenerAttached) {
              attachVisibilityListener();
         }
 
-        // Ažuriraj UI elemente specifične za skener nakon kratke pauze
+        // Ažuriraj UI elemente specifične za skener nakon kratke pauze (da se prikažu tek kad je view spreman)
         setTimeout(() => {
             checkSharePrompt();
             updateRunningTextVisibility();
             updateDeactivatedIndicator();
-             // Pokaži gumb ako treba - provjera opet za svaki slučaj
+             // Pokaži gumb ako treba - provjera opet za svaki slučaj (async poziv)
              Html5Qrcode.getCameras().then(devices => {
                  if (switchCameraButton && isScannerActive && devices && devices.length > 1) {
                     switchCameraButton.style.display = 'block';
@@ -969,20 +981,23 @@
         if (document.body.classList.contains('history-view')) {
             console.log("switchToHistoryView: Već u history view, samo renderiram.");
             renderHistoryView(currentlyViewedDate);
-            return;
+            return; // Završi funkciju ako smo već u tom viewu
         }
 
+        // Resetiraj confirmation gumbe u scanner viewu
         if (removeConfirm || removeNameConfirm) resetRemoveMode();
         if (ocistiConfirm) resetOcistiMode();
 
         console.log("switchToHistoryView: Zaustavljam skener...");
+        // Zaustavi skener PRIJE prelaska na history view. Koristi finally().
         stopScanner().finally(() => {
-            console.log("switchToHistoryView: Skener zaustavljen (ili nije bio aktivan). Mijenjam klase i renderiram.");
+            console.log("switchToHistoryView: Skener zaustavljen (ili nije bio aktivan). Mijenjam klase i renderiram history view.");
+            // Promijeni klase na body elementu
             document.body.classList.remove('scanner-view');
             document.body.classList.add('history-view');
-            document.body.style.backgroundColor = 'white';
+            document.body.style.backgroundColor = 'white'; // Postavi pozadinu za history view
 
-            // Sakrij elemente specifične za skener
+            // Sakrij elemente specifične za skener (neki se već skrivaju u stopScanner, ali neka ostane i ovdje)
             if (counterDeactivatedIndicator) counterDeactivatedIndicator.style.display = 'none';
             if (switchCameraButton) switchCameraButton.style.display = 'none';
             if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none';
@@ -990,7 +1005,9 @@
             if (runningTextContainer) runningTextContainer.style.display = 'none';
             if (sharePromptOverlay) sharePromptOverlay.style.display = 'none';
 
-            renderHistoryView(currentlyViewedDate); // Renderiraj prikaz povijesti
+            // Renderiraj prikaz povijesti
+            renderHistoryView(currentlyViewedDate);
+            console.log("switchToHistoryView: Renderiranje povijesti završeno.");
         });
     }
 
@@ -1003,7 +1020,7 @@
     function renderAllDaysView() { previousHistoryViewState = 'all-days-view'; const punaPovijest = loadFullHistoryFromLocalStorage(); if (!historyContentDiv || !historyPageDiv || !historyDynamicHeaderContentDiv) return; clearDynamicHeaderContent(); const searchBarHtml = `<div id="all-days-search-container"><div style="display: flex; gap: 5px;"><input type="text" id="all-days-search-input" placeholder="UPIŠI ZA PRETRAGU..." style="flex-grow: 1; padding: 0.5em; font-size: 0.9em;"><button id="execute-all-days-search-btn" style="padding: 0.5em 0.6em; font-size: 0.9em;">Traži</button><button id="close-all-days-search-btn" style="padding: 0.5em 0.6em; background-color: #ccc; font-size: 0.9em;">Svi Dani</button></div></div><div id="all-days-summary-info" style="display: none;"></div>`; historyDynamicHeaderContentDiv.innerHTML = searchBarHtml; const resultsPlaceholderHtml = `<div id="search-results-all-days"><p style="text-align:center; color: grey; padding: 1em 0;"><i>Unesite pojam za pretragu ili kliknite "Svi Dani" za prikaz liste.</i></p></div>`; historyContentDiv.innerHTML = resultsPlaceholderHtml; const searchInput = document.getElementById('all-days-search-input'); const executeBtn = document.getElementById('execute-all-days-search-btn'); const closeBtn = document.getElementById('close-all-days-search-btn'); const searchResultsContainer = document.getElementById('search-results-all-days'); const allDaysSummaryContainer = document.getElementById('all-days-summary-info'); const sessionsByDate = punaPovijest.reduce((acc, session) => { const dateStr = getISODateString(new Date(session.timestamp)); if (!dateStr) return acc; if (!acc[dateStr]) { acc[dateStr] = { date: new Date(session.timestamp), sessions: [], totalAmount: 0, totalCount: 0 }; acc[dateStr].date.setHours(0, 0, 0, 0); } acc[dateStr].sessions.push(session); acc[dateStr].totalAmount += session.racuni.reduce((sum, item) => sum + item.amount, 0); acc[dateStr].totalCount += session.racuni.length; return acc; }, {}); const sortedDays = Object.values(sessionsByDate).sort((a, b) => b.date - a.date); if(searchInput && executeBtn && closeBtn && searchResultsContainer && allDaysSummaryContainer) { const newSearchInput = searchInput.cloneNode(true); searchInput.parentNode.replaceChild(newSearchInput, searchInput); newSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') executeAllDaysSearch(); }); const newExecuteBtn = executeBtn.cloneNode(true); executeBtn.parentNode.replaceChild(newExecuteBtn, executeBtn); newExecuteBtn.addEventListener('click', () => { executeAllDaysSearch(); }); const newCloseBtn = closeBtn.cloneNode(true); closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn); newCloseBtn.addEventListener('click', () => { playSound('click-sound'); newSearchInput.value = ''; renderAllDaysList(sortedDays, searchResultsContainer); const totalCountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const totalAmountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); allDaysSummaryContainer.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${totalCountAll}</span></span><span style="font-weight: bold;">UKUPNO: ${totalAmountAll.toFixed(2)} €</span>`; allDaysSummaryContainer.style.display = punaPovijest.length > 0 ? 'flex' : 'none'; }); } else { console.error("Nisu pronađeni svi elementi za pretragu u All Days View."); } if (punaPovijest.length > 0) { const backButtonHtml = `<button id="back-to-current-day-btn" style="background-color: #6c757d; color: white; margin-right: 10px; padding: 0.5em 1em; font-size: 1em;">< NATRAG</button>`; const clearAllButtonHtml = `<button id="clear-history-btn" class="red-btn" style="padding: 0.5em 1em; font-size: 1em;">IZBRIŠI SVU POVIJEST</button>`; const buttonsHtml = `<div style="text-align: center; margin-top: 1.5em; margin-bottom: 1em;">${backButtonHtml}${clearAllButtonHtml}</div>`; if (!document.getElementById('back-to-current-day-btn') && !document.getElementById('clear-history-btn')) { historyContentDiv.insertAdjacentHTML('beforeend', buttonsHtml); } const backToDayBtn = document.getElementById('back-to-current-day-btn'); if (backToDayBtn) { const newBackBtn = backToDayBtn.cloneNode(true); backToDayBtn.parentNode.replaceChild(newBackBtn, backToDayBtn); newBackBtn.addEventListener('click', () => { playSound('click-sound'); renderHistoryView(currentlyViewedDate); }); } const clearAllBtn = document.getElementById('clear-history-btn'); if (clearAllBtn) { if (punaPovijest.length === 0) { clearAllBtn.disabled = true; clearAllBtn.style.opacity = '0.6'; clearAllBtn.style.cursor = 'not-allowed'; } else { clearAllBtn.disabled = false; clearAllBtn.style.opacity = '1'; clearAllBtn.style.cursor = 'pointer'; } clearAllBtn.dataset.confirming = 'false'; const newClearAllBtn = clearAllBtn.cloneNode(true); clearAllBtn.parentNode.replaceChild(newClearAllBtn, clearAllBtn); newClearAllBtn.addEventListener('click', () => { if (newClearAllBtn.disabled) return; playSound('click-sound'); if (newClearAllBtn.dataset.confirming === 'false') { newClearAllBtn.innerText = "Potvrdi Brisanje SVEGA?"; newClearAllBtn.classList.add('confirm-mode'); newClearAllBtn.dataset.confirming = 'true'; } else { localStorage.removeItem(HISTORY_STORAGE_KEY); localStorage.removeItem(COUNTER_KEY); localStorage.removeItem(COUNTER2_KEY); localStorage.removeItem(COUNTER_ACTIVE_KEY); localStorage.removeItem(USER_ID_KEY); localStorage.removeItem(FIRST_USE_KEY); localStorage.removeItem(UNSAVED_COUNT_KEY); localStorage.removeItem(UNSAVED_AMOUNT_KEY); localStorage.removeItem(CAMERA_ID_KEY); /* <<< DODANO BRISANJE KAMERE */ alert("Sva spremljena povijest i podaci brojača/kamere obrisani."); currentlyViewedDate = new Date(); currentlyViewedDate.setHours(0,0,0,0); loadCountersState(); initializeUserTracking(); fetchSheetData().then(() => { renderAllDaysView(); }).catch(() => { renderAllDaysView(); }); } }); const allDaysParentClickHandler = (e) => { const currentClearAllBtn = document.getElementById('clear-history-btn'); if (currentClearAllBtn && currentClearAllBtn.dataset.confirming === 'true' && !currentClearAllBtn.contains(e.target)) { currentClearAllBtn.innerText = "IZBRIŠI SVU POVIJEST"; currentClearAllBtn.classList.remove('confirm-mode'); currentClearAllBtn.dataset.confirming = 'false'; } }; historyPageDiv.removeEventListener('click', allDaysParentClickHandler, true); historyPageDiv.addEventListener('click', allDaysParentClickHandler, true); } } if (punaPovijest.length > 0 && searchResultsContainer && allDaysSummaryContainer) { renderAllDaysList(sortedDays, searchResultsContainer); const totalCountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const totalAmountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); allDaysSummaryContainer.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${totalCountAll}</span></span><span style="font-weight: bold;">UKUPNO: ${totalAmountAll.toFixed(2)} €</span>`; allDaysSummaryContainer.style.display = 'flex'; } else { if (allDaysSummaryContainer) allDaysSummaryContainer.style.display = 'none'; } }
     function renderAllDaysList(daysData, containerElement) { if (!containerElement) return; const opcijeDana = { weekday: 'long' }; const opcijeDatuma = { day: '2-digit', month: '2-digit', year: '2-digit' }; let daysHtml = '<ul id="all-days-list-rendered" style="list-style: none; padding: 0; margin: 0;">'; if (daysData.length === 0) { if (containerElement.id === 'search-results-all-days' && document.getElementById('all-days-search-input')?.value.trim()) { daysHtml += '<li style="text-align:center; color: grey; padding: 1em 0;"><i>Nema rezultata za traženi pojam.</i></li>'; } else { daysHtml += '<li style="text-align:center; color: grey; padding: 1em 0;"><i>Nema spremljene povijesti.</i></li>'; } } else { daysData.forEach(dayInfo => { let imeDana = dayInfo.date.toLocaleDateString('hr-HR', opcijeDana); imeDana = imeDana.charAt(0).toUpperCase() + imeDana.slice(1); const formatiraniDatum = dayInfo.date.toLocaleDateString('hr-HR', opcijeDatuma); const isoDate = getISODateString(dayInfo.date); daysHtml += `<li data-date-iso="${isoDate}" style="background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 12px 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span style="font-weight: bold; font-size: 1.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;">${imeDana}, ${formatiraniDatum}</span><div style="flex-shrink: 0; text-align: right;"><span style="font-size: 0.9em; color: #555; white-space: nowrap;">Računa: ${dayInfo.totalCount}</span><span style="font-weight: bold; margin-left: 15px; white-space: nowrap;">${dayInfo.totalAmount.toFixed(2)} €</span></div></li>`; }); } daysHtml += '</ul>'; containerElement.innerHTML = daysHtml; const listElement = containerElement.querySelector('ul'); if (listElement) { const newListElement = listElement.cloneNode(true); listElement.parentNode.replaceChild(newListElement, listElement); newListElement.addEventListener('click', (e) => { const clickedDayLi = e.target.closest('li[data-date-iso]'); if (clickedDayLi && clickedDayLi.dataset.dateIso) { const selectedDate = new Date(clickedDayLi.dataset.dateIso + 'T00:00:00'); playSound('click-sound'); currentlyViewedDate = selectedDate; renderHistoryView(selectedDate); } }); } }
     function executeAllDaysSearch() { const searchInput = document.getElementById('all-days-search-input'); const resultsContainer = document.getElementById('search-results-all-days'); const summaryContainer = document.getElementById('all-days-summary-info'); if (!searchInput || !resultsContainer || !summaryContainer) return; const searchTerm = searchInput.value.trim().toLowerCase(); lastSearchTerm = searchInput.value.trim(); const normalizedSearchDate = normalizeDateForSearch(searchInput.value.trim()); console.log("--- executeAllDaysSearch ---"); console.log("Tražim pojam:", searchTerm); console.log("Normalizirani datum za pretragu:", normalizedSearchDate); resultsContainer.innerHTML = ''; summaryContainer.style.display = 'none'; summaryContainer.innerHTML = ''; if (!searchTerm) { return; } const punaPovijest = loadFullHistoryFromLocalStorage(); const searchResults = []; const opcijeDana = { weekday: 'long' }; const opcijeDatumaNumeric = { day: '2-digit', month: '2-digit', year: 'numeric' }; const opcijeDatumaShort = { day: '2-digit', month: '2-digit', year: '2-digit' }; punaPovijest.forEach((grupa, index) => { const sessionDate = new Date(grupa.timestamp); console.log(`Provjeravam sesiju #${index + 1} (Timestamp: ${grupa.timestamp})`); const formattedDateNumeric = sessionDate.toLocaleDateString('hr-HR', opcijeDatumaNumeric); const formattedDateShort = sessionDate.toLocaleDateString('hr-HR', opcijeDatumaShort); const normalizedSessionDate = getISODateString(sessionDate); let dayName = sessionDate.toLocaleDateString('hr-HR', opcijeDana).toLowerCase(); const sessionName = grupa.name ? grupa.name.toLowerCase() : ''; let match = false; console.log(`  -> Sesija Datum (ISO): ${normalizedSessionDate}, Dan: ${dayName}, Naziv: ${sessionName || 'N/A'}`); if (normalizedSearchDate && normalizedSessionDate && normalizedSessionDate === normalizedSearchDate) { console.log("    MATCH: Točan datum!"); match = true; } if (!match) { console.log("    Provjeravam kao tekst..."); if (formattedDateShort.includes(searchTerm)) { console.log("    MATCH: Kratki datum sadrži pojam."); match = true; } else if (formattedDateNumeric.includes(searchTerm)) { console.log("    MATCH: Numerički datum sadrži pojam."); match = true; } else if (dayName.includes(searchTerm)) { console.log(`    MATCH: Ime dana ('${dayName}') sadrži pojam ('${searchTerm}').`); match = true; } else if (sessionName && sessionName.includes(searchTerm)) { console.log("    MATCH: Naziv sesije sadrži pojam."); match = true; } else { console.log("    Nema tekstualnog matcha."); } } if (match) { searchResults.push(grupa); } }); console.log("Ukupno pronađeno rezultata (Svi Dani):", searchResults.length); renderSessionSearchResults(searchResults, resultsContainer, searchTerm, summaryContainer); resultsContainer.style.display = 'block'; console.log("--- kraj executeAllDaysSearch ---"); }
-    function renderSessionSearchResults(results, containerElement, searchTerm, summaryContainer) { if (!containerElement || !summaryContainer) return; containerElement.innerHTML = ''; summaryContainer.innerHTML = ''; summaryContainer.style.display = 'none'; if (results.length === 0) { containerElement.innerHTML = '<p style="text-align:center; color: grey; padding: 1em 0;"><i>Nema rezultata za traženi pojam.</i></p>'; return; } const brojRacunaRezultati = results.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const ukupanIznosRezultati = results.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); summaryContainer.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${brojRacunaRezultati}</span></span><span style="font-weight: bold;">UKUPNO: ${ukupanIznosRezultati.toFixed(2)} €</span>`; summaryContainer.style.display = 'flex'; results.sort((a, b) => b.timestamp - a.timestamp); let resultsHtml = '<ul id="search-results-list" style="list-style: none; padding: 0; margin: 0;">'; const opcijeDatuma = { day: '2-digit', month: '2-digit', year: '2-digit' }; results.forEach(grupa => { const vrijemeSpremanja = new Date(grupa.timestamp); const datumString = vrijemeSpremanja.toLocaleDateString('hr-HR', opcijeDatuma); const satiSpremanja = vrijemeSpremanja.getHours().toString().padStart(2, '0'); const minuteSpremanja = vrijemeSpremanja.getMinutes().toString().padStart(2, '0'); const vrijemeSpremanjaFormatirano = `${satiSpremanja}:${minuteSpremanja}`; const ukupnoGrupa = grupa.racuni.reduce((sum, item) => sum + item.amount, 0); const zadnjeVrijeme = grupa.lastQrTime || '??:??'; const prikazNaziva = grupa.name ? `<span class="session-name-history">${grupa.name}</span>` : `<span class="scan-time-history">SKEN</span>`; resultsHtml += `<li data-timestamp="${grupa.timestamp}" style="border: 1px solid #eee; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; cursor: pointer;"><div style="font-weight: bold; margin-right: 8px; color: #666;">${datumString}</div><div style="flex-grow: 1; min-width: 100px; display: inline-flex; align-items: center;">${prikazNaziva} <span style="font-size:0.9em; color:#555; margin-left: 5px;">u ${vrijemeSpremanjaFormatirano}</span></div><div style="flex-shrink: 0; margin-left: auto; padding-left: 10px; text-align: right;"><span class="scan-group-last-qr-time">${zadnjeVrijeme !== '??:??' ? 'zadnji iz ' + zadnjeVrijeme : ''}</span><span style="font-weight: bold; margin-left: 10px;">${ukupnoGrupa.toFixed(2)} €</span></div></li>`; }); resultsHtml += '</ul>'; containerElement.innerHTML = resultsHtml; const resultsList = containerElement.querySelector('ul'); if (resultsList) { const newResultsList = resultsList.cloneNode(true); resultsList.parentNode.replaceChild(newResultsList, resultsList); newResultsList.addEventListener('click', (e) => { const clickedLi = e.target.closest('li[data-timestamp]'); if (clickedLi && clickedLi.dataset.timestamp) { const timestamp = clickedLi.dataset.timestamp; const punaPovijest = loadFullHistoryFromLocalStorage(); const selectedGroup = punaPovijest.find(g => String(g.timestamp) === timestamp); if (selectedGroup) { playSound('click-sound'); if (containerElement.id === 'search-results') { previousHistoryViewState = 'day-search-results'; lastSearchTerm = document.getElementById('search-input')?.value.trim() || ''; } else if (containerElement.id === 'search-results-all-days') { previousHistoryViewState = 'all-days-search-results'; lastSearchTerm = document.getElementById('all-days-search-input')?.value.trim() || ''; } currentlyViewedDate = new Date(selectedGroup.timestamp); currentlyViewedDate.setHours(0,0,0,0); renderGroupDetailView(selectedGroup); } else { console.error("Nije pronađena grupa iz rezultata pretrage:", timestamp); alert("Greška pri otvaranju detalja."); } } }); } }
+    function renderSessionSearchResults(results, containerElement, searchTerm, summaryContainer) { if (!containerElement || !summaryContainer) return; containerElement.innerHTML = ''; summaryContainer.innerHTML = ''; summaryContainer.style.display = 'none'; if (results.length === 0) { containerElement.innerHTML = '<p style="text-align:center; color: grey; padding: 1em 0;"><i>Nema rezultata za traženi pojam.</i></p>'; return; } const brojRacunaRezultati = results.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const ukupanIznosRezultati = results.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); summaryContainer.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${brojRacunaRezultati}</span></span><span style="font-weight: bold;">UKUPNO: ${ukupanIznosRezultati.toFixed(2)} €</span>`; summaryContainer.style.display = 'flex'; results.sort((a, b) => b.timestamp - a.timestamp); let resultsHtml = '<ul id="search-results-list" style="list-style: none; padding: 0; margin: 0;">'; const opcijeDatuma = { day: '2-digit', month: '2-digit', year: '2-digit' }; results.forEach(grupa => { const vrijemeSpremanja = new Date(grupa.timestamp); const datumString = vrijemeSpremanja.toLocaleDateString('hr-HR', opcijeDatuma); const satiSpremanja = vrijemeSpremanja.getHours().toString().padStart(2, '0'); const minuteSpremanja = vrijemeSpremanja.getMinutes().toString().padStart(2, '0'); const vrijemeSpremanjaFormatirano = `${satiSpremanja}:${minuteSpremanja}`; const ukupnoGrupa = grupa.racuni.reduce((sum, item) => sum + item.amount, 0); const zadnjeVrijeme = grupa.lastQrTime || '??:??'; const prikazNaziva = grupa.name ? `<span class="session-name-history">${grupa.name}</span>` : `<span class="scan-time-history">SKEN</span>`; resultsHtml += `<li data-timestamp="${grupa.timestamp}" style="border: 1px solid #eee; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; cursor: pointer;"><div style="font-weight: bold; margin-right: 8px; color: #666;">${datumString}</div><div style="flex-grow: 1; min-width: 100px; display: inline-flex; align-items: center;">${prikazNaziva} <span style="font-size:0.9em; color:#555; margin-left: 5px;">u ${vrijemeSpremanjaFormatirano}</span></div><div style="flex-shrink: 0; margin-left: auto; padding-left: 10px; text-align: right;"><span class="scan-group-last-qr-time">${zadnjeVrijeme !== '??:??' ? 'zadnji iz ' + zadnjeVrijeme : ''}</span><span style="font-weight: bold; margin-left: 10px;">${ukupnoGrupa.toFixed(2)} €</span></div></li>`; }); resultsHtml += '</ul>'; containerElement.innerHTML = resultsHtml; const resultsList = containerElement.querySelector('ul'); if (resultsList) { const newListElement = resultsList.cloneNode(true); resultsList.parentNode.replaceChild(newListElement, resultsList); newListElement.addEventListener('click', (e) => { const clickedLi = e.target.closest('li[data-timestamp]'); if (clickedLi && clickedLi.dataset.timestamp) { const timestamp = clickedLi.dataset.timestamp; const punaPovijest = loadFullHistoryFromLocalStorage(); const selectedGroup = punaPovijest.find(g => String(g.timestamp) === timestamp); if (selectedGroup) { playSound('click-sound'); if (containerElement.id === 'search-results') { previousHistoryViewState = 'day-search-results'; lastSearchTerm = document.getElementById('search-input')?.value.trim() || ''; } else if (containerElement.id === 'search-results-all-days') { previousHistoryViewState = 'all-days-search-results'; lastSearchTerm = document.getElementById('all-days-search-input')?.value.trim() || ''; } currentlyViewedDate = new Date(selectedGroup.timestamp); currentlyViewedDate.setHours(0,0,0,0); renderGroupDetailView(selectedGroup); } else { console.error("Nije pronađena grupa iz rezultata pretrage:", timestamp); alert("Greška pri otvaranju detalja."); } } }); } }
     function executeSearch() { const searchInput = document.getElementById('search-input'); const resultsContainer = document.getElementById('search-results'); const summaryContainer = document.getElementById('search-summary-info-day'); if (!searchInput || !resultsContainer || !summaryContainer) return; const searchTerm = searchInput.value.trim().toLowerCase(); lastSearchTerm = searchInput.value.trim(); const normalizedSearchDate = normalizeDateForSearch(searchInput.value.trim()); console.log("--- executeSearch (Sada pretražuje SVE DANE) ---"); console.log("Tražim pojam:", searchTerm); console.log("Normalizirani datum za pretragu:", normalizedSearchDate); resultsContainer.innerHTML = ''; summaryContainer.style.display = 'none'; summaryContainer.innerHTML = ''; if (!searchTerm) { resultsContainer.innerHTML = '<p style="text-align:center; color: grey;"><i>Unesite pojam za pretragu (datum, dan, naziv).</i></p>'; return; } const punaPovijest = loadFullHistoryFromLocalStorage(); const searchResults = []; const opcijeDana = { weekday: 'long' }; const opcijeDatumaNumeric = { day: '2-digit', month: '2-digit', year: 'numeric' }; const opcijeDatumaShort = { day: '2-digit', month: '2-digit', year: '2-digit' }; punaPovijest.forEach((grupa, index) => { const sessionDate = new Date(grupa.timestamp); console.log(`Provjeravam sesiju #${index + 1} (Timestamp: ${grupa.timestamp})`); const formattedDateNumeric = sessionDate.toLocaleDateString('hr-HR', opcijeDatumaNumeric); const formattedDateShort = sessionDate.toLocaleDateString('hr-HR', opcijeDatumaShort); const normalizedSessionDate = getISODateString(sessionDate); let dayName = sessionDate.toLocaleDateString('hr-HR', opcijeDana).toLowerCase(); const sessionName = grupa.name ? grupa.name.toLowerCase() : ''; let match = false; console.log(`  -> Sesija Datum (ISO): ${normalizedSessionDate}, Dan: ${dayName}, Naziv: ${sessionName || 'N/A'}`); if (normalizedSearchDate && normalizedSessionDate && normalizedSessionDate === normalizedSearchDate) { console.log("    MATCH: Točan datum!"); match = true; } if (!match) { console.log("    Provjeravam kao tekst..."); if (formattedDateShort.includes(searchTerm)) { console.log("    MATCH: Kratki datum sadrži pojam."); match = true; } else if (formattedDateNumeric.includes(searchTerm)) { console.log("    MATCH: Numerički datum sadrži pojam."); match = true; } else if (dayName.includes(searchTerm)) { console.log(`    MATCH: Ime dana ('${dayName}') sadrži pojam ('${searchTerm}').`); match = true; } else if (sessionName && sessionName.includes(searchTerm)) { console.log("    MATCH: Naziv sesije sadrži pojam."); match = true; } else { console.log("    Nema tekstualnog matcha."); } } if (match) { searchResults.push(grupa); } }); console.log("Ukupno pronađeno rezultata (SVI DANI):", searchResults.length); renderSessionSearchResults(searchResults, resultsContainer, searchTerm, summaryContainer); const originalList = document.getElementById('scan-group-list'); if(originalList) originalList.style.display = 'none'; const originalInstruction = document.getElementById('history-select-group-text'); if(originalInstruction) originalInstruction.style.display = 'none'; console.log("--- kraj executeSearch (SVI DANI) ---"); }
     function startSearch() { playSound('click-sound'); console.log("Pokretanje pretrage (sada pretražuje SVE)..."); if (!historyContentDiv || !historyDynamicHeaderContentDiv) return; const originalList = document.getElementById('scan-group-list'); if(originalList) originalList.style.display = 'none'; const originalInstruction = document.getElementById('history-select-group-text'); if(originalInstruction) originalInstruction.style.display = 'none'; const clearDayBtn = document.getElementById('clear-day-btn'); if(clearDayBtn) clearDayBtn.style.display = 'none'; const dateInfoDiv = document.getElementById('history-date-info'); const summaryInfoDiv = document.getElementById('history-summary-info'); if (dateInfoDiv) dateInfoDiv.style.display = 'none'; if (summaryInfoDiv) summaryInfoDiv.style.display = 'none'; let searchContainer = document.getElementById('search-container'); if (!searchContainer) { searchContainer = document.createElement('div'); searchContainer.id = 'search-container'; searchContainer.innerHTML = `<div style="display: flex; gap: 10px; margin-bottom: 0.8em;"><input type="text" id="search-input" placeholder="Pretraži SVE (Datum, Dan, Naziv)..." style="flex-grow: 1; padding: 0.5em;"><button id="execute-search-btn" style="padding: 0.5em 1em;">Traži</button><button id="close-search-btn" style="padding: 0.5em 1em; background-color: #ccc;">Zatvori</button></div><div id="search-summary-info-day" style="display: none;"></div>`; historyDynamicHeaderContentDiv.appendChild(searchContainer); } searchContainer.style.display = 'block'; historyContentDiv.innerHTML = '<div id="search-results"><p style="text-align:center; color: grey;"><i>Unesite pojam za pretragu.</i></p></div>'; const searchResultsDiv = document.getElementById('search-results'); if(searchResultsDiv) searchResultsDiv.style.display = 'block'; const searchInput = document.getElementById('search-input'); const executeBtn = document.getElementById('execute-search-btn'); const closeBtn = document.getElementById('close-search-btn'); const searchSummaryDay = document.getElementById('search-summary-info-day'); if (searchInput) { searchInput.value = ''; searchInput.focus(); } if (searchSummaryDay) { searchSummaryDay.style.display = 'none'; searchSummaryDay.innerHTML = ''; } if (executeBtn) { const newExecuteBtn = executeBtn.cloneNode(true); executeBtn.parentNode.replaceChild(newExecuteBtn, executeBtn); newExecuteBtn.addEventListener('click', executeSearch); } if (closeBtn) { const newCloseBtn = closeBtn.cloneNode(true); closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn); newCloseBtn.addEventListener('click', () => { playSound('click-sound'); if (searchContainer) searchContainer.style.display = 'none'; renderHistoryView(currentlyViewedDate); }); } if (searchInput) { const newSearchInput = searchInput.cloneNode(true); searchInput.parentNode.replaceChild(newSearchInput, searchInput); newSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') executeSearch(); }); } }
     function deleteScansForDay(dateToDelete) { if (!(dateToDelete instanceof Date) || isNaN(dateToDelete)) { console.error("Pokušaj brisanja dana s neispravnim datumom."); alert("Greška: Nije moguće identificirati dan za brisanje."); return; } const dateToDeleteStr = getISODateString(dateToDelete); if (!dateToDeleteStr) return; console.log("Brisanje svih skenova za dan:", dateToDeleteStr); let punaPovijest = loadFullHistoryFromLocalStorage(); const originalLength = punaPovijest.length; const filtriranaPovijest = punaPovijest.filter(grupa => { const grupaDateStr = getISODateString(new Date(grupa.timestamp)); return grupaDateStr !== dateToDeleteStr; }); const newLength = filtriranaPovijest.length; console.log(`Originalna dužina: ${originalLength}, Nova dužina: ${newLength}`); if (newLength < originalLength) { saveFullHistoryToLocalStorage(filtriranaPovijest); playSound('remove-sound'); alert(`Svi skenovi za ${dateToDelete.toLocaleDateString('hr-HR')} obrisani.`); renderAllDaysView(); } else { console.warn("Nisu pronađeni skenovi za brisanje za dan:", dateToDeleteStr); alert("Greška: Nisu pronađeni skenovi za ovaj dan."); const clearDayBtn = document.getElementById('clear-day-btn'); if(clearDayBtn && clearDayBtn.dataset.confirming === 'true') { clearDayBtn.innerText = "IZBRIŠI OVAJ DAN"; clearDayBtn.classList.remove('confirm-mode'); clearDayBtn.dataset.confirming = 'false'; } } }

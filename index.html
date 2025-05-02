@@ -167,20 +167,21 @@
     }
 
     /* NOVI Stil za overlay s popisom kamera */
+     /* NOVI Stil za overlay s popisom kamera - PRILAGOĐENO ZA TAMNIJU POZADINU */
     #camera-selection-overlay {
-        position: fixed; /* Zaljepljen za ekran */
-        top: 55px;       /* Ispod gumba (prilagodi ako treba) */
+        position: fixed;
+        top: 55px;
         right: 10px;
-        background-color: white;
-        border: 1px solid #ccc;
+        background-color: rgba(0, 0, 0, 0.8); /* Tamnija poluprozirna pozadina overlaya */
+        border: 1px solid #555; /* Tamniji rub */
         border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        z-index: 6;      /* Iznad gumba */
-        padding: 5px 0; /* Gore/dolje padding */
-        display: none;   /* Početno skriven */
-        max-height: 150px; /* Ograničenje visine ako ima puno kamera */
-        overflow-y: auto; /* Scroll ako treba */
-        min-width: 150px; /* Minimalna širina */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        z-index: 6;
+        padding: 5px 0;
+        display: none;
+        max-height: 150px;
+        overflow-y: auto;
+        min-width: 150px;
     }
     #camera-list {
         list-style: none;
@@ -194,15 +195,20 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: white; /* <-- Tekst je bijeli */
+        background-color: transparent; /* <-- Pozadina stavke je prozirna (koristi pozadinu overlaya) */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Lagana bijela linija između stavki */
     }
+     #camera-list li:last-child {
+        border-bottom: none; /* Ukloni donju liniju za zadnju stavku */
+     }
     #camera-list li:hover {
-        background-color: #f0f0f0;
+        background-color: rgba(255, 255, 255, 0.1); /* Lagana bijela pozadina na hover (lagano se osvijetli) */
     }
-    #camera-list li.selected-camera { /* Opcionalno: za označavanje trenutne */
+    #camera-list li.selected-camera {
         font-weight: bold;
-        background-color: #e0e0e0;
+        background-color: rgba(255, 255, 255, 0.2); /* Malo jača bijela pozadina za odabrano */
     }
-
     /* --- KRAJ NOVIH STILOVA --- */
 
     @keyframes pulse { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.1); } 100% { transform: translateX(-50%) scale(1); } }

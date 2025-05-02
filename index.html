@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="hr">
 <head>
@@ -227,10 +226,13 @@
 
   <div id="loaded-message" style="display: none;">UČITANO</div>
   <div id="duplicate-warning" style="display: none;">TAJ RAČUN JE URAČUNAT</div>
+  <!-- Uklonjen onclick atribut, logika je sada u JS event listeneru -->
   <div id="total-container"> <div id="total">UKUPNO: 0.00 €</div> <button id="ocisti-button" style="display: none;">SPREMI<br>I OČISTI</button> </div>
+  <!-- Uklonjen onclick atribut, logika je sada u JS event listeneru -->
   <div id="session-name-container"> <button id="add-name-btn">DODAJ NAZIV</button> <input type="text" id="session-name-input" placeholder="Unesi naziv sesije..." maxlength="30"> <span id="session-name-display"> <span id="session-name-text"></span> <span class="edit-icon">Uredi</span> </span> </div>
   <div id="invoice-count">0 RAČUNA</div>
   <div id="history" style="display: none;"> <ul id="historyList"></ul> </div>
+  <!-- Uklonjen onclick atribut, logika je sada u JS event listeneru -->
   <button class="red-btn" id="remove-from-list-btn" style="display:none;">Obriši iz liste</button>
   <button id="history-toggle-btn">POVIJEST</button>
   <button id="share-button" style="display: none;">DIJELI RAČUNATOR</button>
@@ -384,7 +386,7 @@
     function saveCounterActiveState() { localStorage.setItem(COUNTER_ACTIVE_KEY, isCounterDecrementActive); }
 
     // *** FUNKCIJE ZA DOHVAĆANJE PODATAKA IZ SHEETA ***
-    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE')) { console.warn("URL Google Apps Scripta nije postavljen!"); tekstPoruka = ""; initializeCounters(); updateRunningText(); return Promise.reject(new Error("URL nije postavljen")); } try { const response = await fetch(APPS_SCRIPT_URL); if (!response.ok) { throw new Error(`HTTP greška ${response.status}`); } const data = await response.json(); console.log("Podaci dohvaćeni:", data); let newPrag = data.pragBrojac !== undefined ? parseInt(data.pragBrojac, 10) : 0; if (isNaN(newPrag) || newPrag < 0) { newPrag = 0; } else if (newPrag > 500) { newPrag = 500; } brojac2 = newPrag; saveBrojac2(); tekstPoruka = data.trceciTekst || ""; initializeCounters(); updateRunningText(); return Promise.resolve(); } catch (error) { console.error("Greška pri dohvaćanju podataka iz Sheeta:", error); tekstPoruka = ""; initializeCounters(); updateRunningText(); return Promise.reject(error); } }
+    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE')) { console.warn("Log: URL Google Apps Scripta nije postavljen!"); tekstPoruka = ""; initializeCounters(); updateRunningText(); return Promise.reject(new Error("URL nije postavljen")); } try { const response = await fetch(APPS_SCRIPT_URL); if (!response.ok) { throw new Error(`HTTP greška ${response.status}`); } const data = await response.json(); console.log("Log: Podaci iz Google Sheeta dohvaćeni:", data); let newPrag = data.pragBrojac !== undefined ? parseInt(data.pragBrojac, 10) : 0; if (isNaN(newPrag) || newPrag < 0) { newPrag = 0; } else if (newPrag > 500) { newPrag = 500; } brojac2 = newPrag; saveBrojac2(); tekstPoruka = data.trceciTekst || ""; initializeCounters(); updateRunningText(); return Promise.resolve(); } catch (error) { console.error("Greška pri dohvaćanju podataka iz Sheeta:", error); tekstPoruka = ""; initializeCounters(); updateRunningText(); return Promise.reject(error); } }
 
     // *** INICIJALIZACIJA BROJAČA ***
     function initializeCounters() { console.log("Inicijalizacija brojača..."); if (brojac === null) { console.log("Brojač 1 nije inicijaliziran, postavljanje na brojač 2."); brojac = brojac2; saveBrojac(); } else { console.log("Brojač 1 učitan s vrijednošću:", brojac); } checkSharePrompt(); updateRunningTextVisibility(); }
@@ -785,17 +787,6 @@
 
     function isElementOrParentHidden(element) {
       if (!element) return true;
-      // Provjeri i body klasu, jer history-view skriva elemente CSS-om
-      if (document.body.classList.contains('history-view')) {
-        // Gruba provjera: ako je element unutar body.history-view i nije history-page, vjerojatno je skriven
-        // Ovo je primarno za elemente poput #reader, #instruction itd.
-        if (historyPageDiv && !historyPageDiv.contains(element)) {
-            // Ovo je heuristika, preciznije bi bilo provjeriti CSS display,
-            // ali body.history-view display:none na scanner elemente je dovoljan za naš slučaj.
-            return true;
-        }
-      }
-
       // Klasična provjera vidljivosti po CSS display propertyu za sve elemente
       let currentElement = element;
       while (currentElement && currentElement !== document.body) {
@@ -803,9 +794,34 @@
         currentElement = currentElement.parentElement;
       }
       // Na kraju, provjeri i sam body element (iako rijetko ima display: none)
-      if (window.getComputedStyle(document.body).display === 'none') return true;
+       if (window.getComputedStyle(document.body).display === 'none') return true;
 
-      return false;
+      // Dodatno provjeri da li smo u history view, jer on skriva elemente skenera
+      if (document.body.classList.contains('history-view')) {
+         // Ovdje se može dodati specifična provjera ako je element dio skener UI-ja
+         // Za elemente unutar #reader, ili elemente s fiksnim pozicijama koji se skrivaju u history view
+         // (npr. readerDiv, instructionDiv, switchCameraButton, totalContainer, sessionNameContainer, invoiceCountDiv, removeButton, historyDiv)
+         // Ovo je brža provjera od provjere svakog roditelja do bodyja.
+         // Možemo provjeriti da li element ili neki njegov roditelj ima ID jednog od ovih skener UI elemenata.
+         let scannerElementsIds = ['reader', 'scan-instruction', 'switch-camera-btn', 'total-container', 'session-name-container', 'invoice-count', 'remove-from-list-btn', 'history'];
+         let checkElement = element;
+         while (checkElement && checkElement !== document.body) {
+             if (checkElement.id && scannerElementsIds.includes(checkElement.id)) {
+                 // Ako smo u history viewu, a ovaj element je dio scanner UI-ja, smatraj ga skrivenim
+                 return document.body.classList.contains('history-view');
+             }
+             checkElement = checkElement.parentElement;
+         }
+          // Ako element nije direktno dio poznatih scanner UI elemenata, osloni se na display check ili je uvijek vidljiv
+          // Ali ako smo u history viewu, scanner UI elementi bi TREBALI biti skriveni CSS-om.
+          // Možemo dodati i generalnu provjeru display: none ako nismo uhvaćeni gore.
+           if (window.getComputedStyle(element).display === 'none') return true; // Double check
+
+          return false; // Ako smo u history view ali element nije scanner UI, smatramo ga vidljivim (npr. history-page)
+      }
+
+
+      return false; // Standardno, ako nismo u history view i display nije none, vidljivo je.
     }
 
 
@@ -831,11 +847,20 @@
                   switchCameraButton.style.display = 'none';
              }
              if (instructionDiv && document.body.classList.contains('scanner-view')) instructionDiv.style.display = 'block';
+             if (readerDiv && readerDiv.innerHTML === '') {
+                  // Ako je skener aktivan, ali reader div prazan (možda nakon visibility change buga), pokušaj ga očistiti i ponovno startati?
+                  // Ovo je kompleksno, za sada samo logiraj. Idealno, html5-qrcode bi trebao upravljati video elementom.
+                  console.warn("[initializeScanner] Skener aktivan, ali reader div prazan. Mogući bug u prikazu.");
+                  // Opcionalno: stop pa initialize
+                  // await stopScanner();
+                  // await initializeScanner();
+             }
+
 
              return;
          }
         if (isElementOrParentHidden(readerDiv)) {
-             console.warn("[initializeScanner] Reader element je skriven, ne mogu pokrenuti skener.");
+             console.warn("[initializeScanner] Reader element (#reader) je skriven ili mu roditelj, ne mogu pokrenuti skener.");
              isScannerActive = false; // Osiguraj da je stanje ispravno
              if (readerDiv) readerDiv.innerHTML = '<div style="padding:20px; color: red; text-align:center;">Greška: Reader element je skriven.</div>';
              if (instructionDiv) instructionDiv.style.display = 'none';
@@ -859,8 +884,15 @@
 
         // Kreiraj novu instancu SAMO ako ne postoji
         if (!html5QrCodeInstance) {
-             html5QrCodeInstance = new Html5Qrcode("reader");
-             console.log("[initializeScanner] Kreirana nova Html5Qrcode instanca.");
+             try {
+                 html5QrCodeInstance = new Html5Qrcode("reader");
+                 console.log("[initializeScanner] Kreirana nova Html5Qrcode instanca.");
+             } catch (e) {
+                 console.error("[initializeScanner] Greška pri kreiranju Html5Qrcode instance:", e);
+                 if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red; text-align:center;">Greška pri inicijalizaciji skenera. (${e.message || e}).</div>`;
+                 isScannerActive = false;
+                 return; // Prekini inicijalizaciju
+             }
         }
 
 
@@ -869,6 +901,10 @@
         try {
             console.log("[initializeScanner] Dohvaćam listu kamera...");
             // POKUŠAJ ponovno dohvatiti listu kamera svaki put
+             // Provjeri postoji li metoda getCameras na instanci
+             if (!html5QrCodeInstance || typeof html5QrCodeInstance.getCameras !== 'function') {
+                 throw new Error("Html5Qrcode instanca nije ispravna ili nedostaje getCameras.");
+             }
             availableCameras = await html5QrCodeInstance.getCameras(); // Koristi metodu instance
             console.log("[initializeScanner] Dohvaćene kamere:", availableCameras);
 
@@ -955,7 +991,7 @@
                      checkSharePrompt(); // Pokaži share prompt ako treba
                      updateDeactivatedIndicator(); // Pokaži indikator ako treba
                      // Očisti privremenu poruku u reader divu - html5-qrcode obično to radi sam
-                     if (readerDiv && readerDiv.innerHTML.includes('Pokrećem kameru')) readerDiv.innerHTML = '';
+                     // if (readerDiv && readerDiv.innerHTML.includes('Pokrećem kameru')) readerDiv.innerHTML = ''; // Html5-qrcode bi ovo trebao sam
 
                  } else {
                      // Ako nismo više u scanner viewu, zaustavi skener (ovo bi trebao uhvatiti visibility listener, ali za sigurnost)
@@ -994,7 +1030,7 @@
              }
             if (instructionDiv) instructionDiv.style.display = 'none';
 
-            // Pokaži gumb za promjenu kamere samo ako smo uspješno dobili listu kamera, ali start je failao
+            // Pokaži gumb za promjenu kamere samo ako smo uspješno dobili listu kamera (tj. availableCameras.length > 1)
             if (switchCameraButton && availableCameras && availableCameras.length > 1) {
                 switchCameraButton.style.display = 'block'; // Pokaži gumb da korisnik može probati drugu kameru
             } else {
@@ -1049,11 +1085,15 @@
 
     async function toggleCameraSelection() {
          playSound('click-sound');
-         if (!cameraSelectionOverlay || !cameraListUl || !switchCameraButton) return;
+         if (!cameraSelectionOverlay || !cameraListUl || !switchCameraButton) {
+              console.warn("[toggleCameraSelection] Nedostaju DOM elementi za odabir kamere.");
+              return;
+         }
 
          // Ako je overlay vidljiv, sakrij ga
          if (cameraSelectionOverlay.style.display === 'block') {
              cameraSelectionOverlay.style.display = 'none';
+             console.log("[toggleCameraSelection] Sakriven overlay za odabir kamere.");
              return;
          }
 
@@ -1062,6 +1102,10 @@
              showTemporaryMessage("Dohvaćam kamere...", 1000);
              try {
                  console.log("[toggleCameraSelection] Lista kamera nije dostupna, pokušavam ponovno dohvatiti...");
+                  // Provjeri postoji li instanca i metoda
+                  if (!html5QrCodeInstance || typeof html5QrCodeInstance.getCameras !== 'function') {
+                      throw new Error("Html5Qrcode instanca nije ispravna ili nedostaje getCameras.");
+                  }
                  availableCameras = await html5QrCodeInstance.getCameras(); // Koristi metodu instance
                  console.log("[toggleCameraSelection] Kamere dohvćene:", availableCameras);
              } catch(err) {

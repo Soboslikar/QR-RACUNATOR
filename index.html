@@ -718,7 +718,9 @@
 
             } catch (err) {
                 console.error(`>>> [InitializeScanner] start() FAILED za PRVU kameru ${firstAttemptCamera.id}:`, err);
-
+              
+console.error(`[InitializeScanner] Greška detalji UNUTAR CATCH-a: name=${err.name}, message=${err.message}`);
+                // *********************************
                 // DRUGI POKUŠAJ (samo ako je NotReadableError i ima više od jedne kamere)
                 if (err.name === 'NotReadableError' && devices.length > 1) {
                      console.log(`Prvo startanje neuspješno (${err.name}). Pokušavam s DRUGOM kamerom...`);

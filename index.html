@@ -1,4 +1,38 @@
+U redu, razumijem. Korigirat ću kod prema vašim preciznim uputama.
 
+Evo izmjena koje ću napraviti:
+
+1.  **HTML Audio Tagovi:**
+    *   Putanja za `clear-session-sound` bit će ispravljena na `Čišćenje.mp3`.
+    *   Putanja za `remove-sound` i dalje će biti `smeče.mp3`.
+    *   Putanja za `scan-sound` ostaje `Učitano.mp3`.
+    *   Putanja za `click-sound` ostaje `click2.mp3`.
+    *   Putanja za `error-sound` ostaje `error.mp3`.
+
+2.  **Zvuk SPREMI I OČISTI (`startOcistiConfirm`):**
+    *   Prvi klik (za prelazak u mod potvrde) neće imati zvuk.
+    *   Drugi klik (za izvršenje spremanja i čišćenja) pokrenut će samo `clear-session-sound` (`Čišćenje.mp3`).
+
+3.  **Zvukovi skeniranja i greške (`handleScan`):**
+    *   Kada se skenira **novi, jedinstveni** račun:
+        *   Zvuk `scan-sound` (`Učitano.mp3`) će se reproducirati.
+        *   Poruka "UČITANO" će se prikazati.
+        *   Postavit će se odgoda od 2 sekunde tijekom koje se zvuk `error-sound` i poruka "TAJ RAČUN JE URAČUNAT" neće prikazivati, čak i ako se skenira duplikat.
+    *   Kada se skenira **duplikat** računa:
+        *   Ako je prošlo više od 2 sekunde od zadnjeg *uspješnog* skeniranja:
+            *   Zvuk `error-sound` (`error.mp3`) će se reproducirati (uz ugrađeni 0.5s cooldown unutar `playSound` funkcije kako bi se spriječilo neprestano ponavljanje).
+            *   Poruka "TAJ RAČUN JE URAČUNAT" će se prikazati (koja sada koristi `showTemporaryMessage` ali je prikaz uvjetovan istom odgodom kao i zvuk greške).
+        *   Ako nije prošlo 2 sekunde od zadnjeg *uspješnog* skeniranja, ništa se ne događa (niti zvuk greške, niti poruka duplikata) - time se daje prioritet poruci "UČITANO".
+
+4.  **Zvukovi brisanja (na svim mjestima):**
+    *   Svi pozivi na `playSound('remove-sound')` sada će koristiti `smeče.mp3`. Ovo uključuje brisanje iz liste u skeneru, brisanje spremljene sesije, brisanje dana i brisanje cijele povijesti.
+
+5.  **Zvukovi klikova (`click-sound`):**
+    *   `click-sound` (`click2.mp3`) će se koristiti za sve ostale interakcije s gumbima (navigacija, dodavanje/uređivanje naziva, prvi klik na potvrdu brisanja u listi/povijesti/dana/svega, odabir kamere), *osim* tamo gdje su specifični zvukovi (`scan-sound`, `error-sound`, `clear-session-sound`, `remove-sound`) definirani. Logika potvrde brisanja u povijesti će biti ispravljena kako bi se brisanje izvršilo i zvuk `remove-sound` (smeče.mp3) pokrenuo tek na *drugi* klik ("Potvrdi").
+
+Evo cijelog koda s primijenjenim izmjenama:
+
+```html
 <!DOCTYPE html>
 <html lang="hr">
 <head>
@@ -227,8 +261,11 @@
   </div>
   <!-- KRAJ NOVIH ELEMENATA -->
 
+  <!-- Poruke UČITANO i DUPLIKAT - koristimo iste DOM elemente -->
   <div id="loaded-message" style="display: none;">UČITANO</div>
   <div id="duplicate-warning" style="display: none;">TAJ RAČUN JE URAČUNAT</div>
+  <!-- Kraj poruka -->
+
   <div id="total-container"> <div id="total">UKUPNO: 0.00 €</div> <button id="ocisti-button" onclick="startOcistiConfirm()" style="display: none;">SPREMI<br>I OČISTI</button> </div>
   <div id="session-name-container"> <button id="add-name-btn" onclick="startAddName()">DODAJ NAZIV</button> <input type="text" id="session-name-input" placeholder="Unesi naziv sesije..." maxlength="30"> <span id="session-name-display"> <span id="session-name-text"></span> <span class="edit-icon" onclick="startAddName()">Uredi</span> </span> </div>
   <div id="invoice-count">0 RAČUNA</div>
@@ -252,7 +289,7 @@
   <audio id="remove-sound" src="https://raw.githubusercontent.com/Soboslikar/QR-RACUNATOR/main/smeče.mp3" preload="auto"></audio>
   <audio id="error-sound" src="https://raw.githubusercontent.com/Soboslikar/QR-RACUNATOR/main/error.mp3" preload="auto"></audio>
   <!-- ISPRAVLJENA PUTANJA ZA Čišćenje.mp3 -->
-  <audio id="clear-session-sound" src="https://raw.githubusercontent.com/Soboslikar/QR-RACUNATOR/main/Čiščenje.mp3" preload="auto"></audio>
+  <audio id="clear-session-sound" src="https://raw.githubusercontent.com/Soboslikar/QR-RACUNATOR/main/Čišćenje.mp3" preload="auto"></audio>
 
 
   <script>
@@ -302,17 +339,17 @@
     // NOVI DOM Elementi za kameru
     let switchCameraButton, cameraSelectionOverlay, cameraListUl;
 
-    // --- VARIJABLE ZA KONTROLU ZVUKOVA ---
+    // --- VARIJABLE ZA KONTROLU ZVUKOVA I PORUKA ---
     let errorSoundCooldown = false; // Flag za spriječavanje prebrzog ponavljanja error zvuka (0.5s cooldown)
-    let ignoreErrorSoundUntil = 0; // Timestamp do kojeg ignoriramo error zvuk nakon uspješnog skena (2s delay)
-    let messageTimeoutId = null; // ID timeouta za poruku "UČITANO"
+    let ignoreErrorSoundUntil = 0; // Timestamp do kojeg ignoriramo error zvuk i poruku nakon uspješnog skena (2s delay)
+    let messageTimeoutId = null; // ID timeouta za poruku "UČITANO" ili "DUPLIKAT"
     // -----------------------------------
 
 
     // *** POMOĆNE FUNKCIJE ***
     const parseTime = (timeStr) => { if (!timeStr || typeof timeStr !== 'string' || timeStr === '??:??' || timeStr.length !== 5 || timeStr[2] !== ':') return -1; const parts = timeStr.split(':'); const hours = parseInt(parts[0], 10); const minutes = parseInt(parts[1], 10); if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1; return hours * 60 + minutes; };
 
-    // --- MODIFICIRANA playSound FUNKCIJA ZA COOLDOWN ---
+    // --- MODIFICIRANA playSound FUNKCIJA ZA COOLDOWN (SAMO ZA ERROR) ---
     function playSound(id) {
         // Posebno rukovanje za error zvuk zbog cool down logike
         if (id === 'error-sound') {
@@ -330,6 +367,7 @@
 
         const sound = document.getElementById(id);
         if (sound) {
+            // Uvjeravamo se da je zvuk u potpunosti zaustavljen i resetiran prije ponovnog sviranja
             sound.pause();
             sound.currentTime = 0;
             // play() vraća Promise, handlamo potentialne greške (npr. autoplay policy)
@@ -345,27 +383,39 @@
             console.warn(`Audio element "${id}" nije pronađen.`);
         }
     }
-    // -------------------------------------------------
+    // -----------------------------------------------------------------
 
     function getISODateString(date) { if (!(date instanceof Date) || isNaN(date)) { console.error("getISODateString primio neispravan datum:", date); return null; } const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
 
-    // --- MODIFICIRANA showTemporaryMessage FUNKCIJA ZA ČIŠĆENJE TIMEOUTA ---
-    function showTemporaryMessage(messageText, duration = 1500) {
-        if (!loadedMsg) return;
-        // Clear any existing timeout before setting a new one
+    // --- MODIFICIRANA showTemporaryMessage FUNKCIJA ZA PRIKAZ PORUKA ---
+    // Koristimo je za obje poruke (UČITANO i DUPLIKAT)
+    function showTemporaryMessage(messageElement, messageText, duration = 1500) {
+        if (!messageElement) return;
+
+        // Clear any existing timeout before setting a new one specific to this message mechanism
         if (messageTimeoutId) {
             clearTimeout(messageTimeoutId);
             messageTimeoutId = null;
         }
-        loadedMsg.innerText = messageText;
-        loadedMsg.style.display = 'block';
-        loadedMsg.style.animation = 'none'; // Reset animation
-        loadedMsg.offsetHeight; // Trigger reflow
-        loadedMsg.style.animation = 'zoomFade 1s ease-out'; // Start animation
-        // Store the timeout ID
+
+        messageElement.innerText = messageText;
+        messageElement.style.display = 'block';
+
+        // Reset i pokretanje animacije
+        messageElement.style.animation = 'none';
+        // Koristimo requestAnimationFrame za osiguravanje reflowa prije restarta animacije
+        requestAnimationFrame(() => {
+             messageElement.offsetHeight; // Trigger reflow
+             messageElement.style.animation = 'zoomFade 1s ease-out';
+        });
+
+
+        // Store the timeout ID to hide the message
         messageTimeoutId = setTimeout(() => {
-            if (loadedMsg && loadedMsg.innerText === messageText) {
-                loadedMsg.style.display = 'none';
+            // Provjeravamo da je element još uvijek onaj koji želimo sakriti
+            // i da je tekst još uvijek isti (da ga druga poruka nije u međuvremenu pregazila)
+            if (messageElement && messageElement.innerText === messageText) {
+                messageElement.style.display = 'none';
                 messageTimeoutId = null; // Clear ID after execution
             }
         }, duration);
@@ -464,7 +514,7 @@
              deleteWarningDiv.style.display = 'block';
          } else {
              deleteWarningDiv.style.display = 'none';
-         }
+        }
     }
     function updateRunningText() { if (runningTextSpan) { runningTextSpan.textContent = tekstPoruka; } updateRunningTextVisibility(); }
     function updateRunningTextVisibility() { const shouldShowText = tekstPoruka && (!sharePromptOverlay || sharePromptOverlay.style.display === 'none') && document.body.classList.contains('scanner-view'); if (runningTextContainer) { runningTextContainer.style.display = shouldShowText ? 'block' : 'none'; if (shouldShowText && runningTextSpan) { runningTextSpan.style.animation = 'none'; runningTextSpan.offsetHeight; runningTextSpan.style.animation = ''; } } }
@@ -499,7 +549,7 @@
         const inputText = sessionNameInput.value.trim();
 
         if (inputText === "##--##") {
-            showTemporaryMessage("RJEŠENO");
+            showTemporaryMessage(loadedMsg, "RJEŠENO"); // Koristimo loadedMsg za ovu poruku
             isCounterDecrementActive = false;
             saveCounterActiveState();
             updateDeactivatedIndicator();
@@ -511,7 +561,7 @@
             if(removeNameConfirm) resetRemoveMode();
             return;
         } else if (inputText === "##00##") {
-            showTemporaryMessage("RESETIRANO");
+            showTemporaryMessage(loadedMsg, "RESETIRANO"); // Koristimo loadedMsg za ovu poruku
             brojac = 0;
             brojac2 = 0;
             isCounterDecrementActive = true;
@@ -655,7 +705,7 @@
         const sessionDetails = { sessionName: novaGrupa.name, invoiceCount: novaGrupa.racuni.length, totalAmount: sessionTotalAmount.toFixed(2), lastQrTime: novaGrupa.lastQrTime };
         const eventData = { Event: 'session_saved', Details: JSON.stringify(sessionDetails) };
         sendLogData(eventData);
-        try { localStorage.removeItem(UNSAVED_COUNT_KEY); localStorage.removeItem(UNSAVED_AMOUNT_KEY); console.log("Obrisano nesačuvano stanje nakon spremanja sesije."); } catch (lsError) { console.error("Greška brisanja nesačuvanog stanja iz localStorage:", lsError); }
+        try { localStorage.removeItem(UNSAVED_COUNT_KEY); localStorage.removeItem(UNSAVED_AMOUNT_KEY); console.log("Obrisano nesačuvano stanje nakon spremanja sesije."); } catch (lsError) { console.error("Greška brisanja nesačuvanog stanja u localStorage:", lsError); }
         povijest = [];
         ukupno = 0;
         currentSessionName = null;
@@ -679,11 +729,11 @@
         if (removeConfirm) resetRemoveMode();
         if (ocistiConfirm) resetOcistiMode();
 
-        // --- Logika za poruku "UČITANO" i "TAJ RAČUN JE URAČUNAT" ---
-        // Sakrij samo duplicate warning ako je vidljiv, učitano poruku ne diramo još
+        // --- Logika za poruke ---
+        // Sakrij duplicate warning ako je vidljiv, učitano poruku NE diramo
         if (duplicateWarning) duplicateWarning.style.display = 'none';
-        // Nema potrebe skrivati loadedMsg ovdje, showTemporaryMessage to radi pametnije
-        // -------------------------------------------------------------
+        // showTemporaryMessage automatski čisti prethodni timeout, tako da ne moramo ovdje ručno sakrivati loadedMsg
+        // -------------------------
 
 
         try {
@@ -697,29 +747,41 @@
             const isDuplicateInCurrent = povijest.some(item => item.qrCode === decodedText);
             let isDuplicateInRecentSaved = false;
             const fullHistory = loadFullHistoryFromLocalStorage();
-            if (fullHistory.length > 0) { const thirtyDaysAgoTimestamp = Date.now() - (30 * 24 * 60 * 60 * 1000); const recentHistory = fullHistory.filter(grupa => grupa.timestamp >= thirtyDaysAgoTimestamp); isDuplicateInRecentSaved = recentHistory.some(grupa => grupa.racuni.some(item => item.qrCode === decodedText)); if(isDuplicateInRecentSaved) console.log("Duplikat pronađen u zadnjih 30 dana."); }
+            // Provjera duplikata u zadnjih 30 dana (postojeća logika)
+            if (fullHistory.length > 0) {
+                const thirtyDaysAgoTimestamp = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                const recentHistory = fullHistory.filter(grupa => grupa.timestamp >= thirtyDaysAgoTimestamp);
+                isDuplicateInRecentSaved = recentHistory.some(grupa => grupa.racuni.some(item => item.qrCode === decodedText));
+                if(isDuplicateInRecentSaved) console.log("Duplikat pronađen u zadnjih 30 dana.");
+            }
+
 
             if (isDuplicateInCurrent || isDuplicateInRecentSaved) {
                  console.warn("Duplikat pronađen:", decodedText);
 
-                 // --- LOGIKA ZVUKA GREŠKE (Duplikat) ---
-                 // Svira samo ako je prošlo 2 sekunde od zadnjeg uspješnog skena I nije na 0.5s cooldownu
+                 // --- LOGIKA ZVUKA I PORUKE GREŠKE (Duplikat) ---
+                 // Provjeri je li prošla odgoda od zadnjeg uspješnog skena
                  if (Date.now() >= ignoreErrorSoundUntil) {
-                     playSound('error-sound');
+                     playSound('error-sound'); // Svira error (uz 0.5s cooldown unutar playSound)
+                     showTemporaryMessage(duplicateWarning, "TAJ RAČUN JE URAČUNAT", 1500); // Prikaži poruku duplikata
                  } else {
-                     console.log(`Error sound suppressed due to recent successful scan (until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}).`);
+                     console.log(`Duplicate ignored temporarily due to recent successful scan (until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}).`);
+                     // Ne sviraj error i ne prikazuj poruku duplikata unutar 2s odgode
+                     // Ovdje NE pozivamo showTemporaryMessage za duplicateWarning,
+                     // time osiguravamo da loadedMsg ostane prikazan ako je bio prije.
                  }
-                 // ---------------------------------------
+                 // -----------------------------------------------
 
-                 // Prikaži poruku o duplikatu, prekidajući eventualnu poruku "UČITANO"
-                 // showTemporaryMessage automatski čisti prethodni timeout
-                 showTemporaryMessage("TAJ RAČUN JE URAČUNAT", 1500); // Koristimo istu funkciju za prikaz
-                 if (duplicateWarning) { // Održavamo animaciju iako koristimo showTemporaryMessage
-                     duplicateWarning.style.display = 'block';
+                 // Animacija za duplicateWarning (može raditi neovisno o showTemporaryMessage)
+                 if (duplicateWarning) {
+                      // Prikazivanje duplicateWarning elementa je sada dio showTemporaryMessage ako odgoda prođe.
+                      // Ali možemo ovdje osigurati da se animacija pokrene ako je element vidljiv (ili će postati vidljiv)
+                      // Ovo je malo redundantno sa showTemporaryMessage, ali zadržano radi postojeće animacije.
                      duplicateWarning.style.animation = 'none';
-                     duplicateWarning.offsetHeight; // Okida reflow za restart animacije
+                     duplicateWarning.offsetHeight; // Trigger reflow
                      duplicateWarning.style.animation = 'pulse 0.5s ease-in-out 3 alternate';
-                     setTimeout(() => { if (duplicateWarning) duplicateWarning.style.display = 'none'; }, 1500); // Sakrij element nakon animacije
+                      // Sakrivanje elementa je sada upravljano kroz showTemporaryMessage timeout, ne ovaj timeout
+                      // setTimeout(() => { if (duplicateWarning) duplicateWarning.style.display = 'none'; }, 1500); // UKLONJENO
                  }
                  return; // Ne obrađuj duplikat
             }
@@ -741,20 +803,20 @@
 
             playSound('scan-sound'); // ZVUK ZA USPJEŠNO SKENIRANO (Učitano.mp3)
 
-            // --- POSTAVI BLOKADU ZA ERROR ZVUK NAKON USPJEŠNOG SKENA ---
-            ignoreErrorSoundUntil = Date.now() + 2000; // Blokiraj error zvuk sljedeće 2 sekunde
-            console.log(`Error sound blocked until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}`);
-            // --------------------------------------------------------
+            // --- POSTAVI BLOKADU ZA ERROR ZVUK I PORUKU NAKON USPJEŠNOG SKENA ---
+            ignoreErrorSoundUntil = Date.now() + 2000; // Blokiraj error zvuk i poruku sljedeće 2 sekunde
+            console.log(`Error sound and message blocked until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}`);
+            // ------------------------------------------------------------------
 
             updateDisplay();
-            showTemporaryMessage("UČITANO", 1000); // Prikaži poruku "UČITANO"
+            showTemporaryMessage(loadedMsg, "UČITANO", 1000); // Prikaži poruku "UČITANO" koristeći showTemporaryMessage
             if (deleteWarningDiv) { deleteWarningDiv.dataset.lastScanText = `ZADNJI RAČUN: ${newItem.time} = ${newItem.amount.toFixed(2)} €`; handleInfoDeleteMessageVisibility(); }
         } catch (error) {
             console.error("Greška obrade QR:", error, decodedText);
-            // Možda bi se i ovdje mogao dodati error sound? Trenutno nema zahtjeva za to.
-            // showTemporaryMessage("GREŠKA!", 1500); // Opcija: Prikaz poruke za opću grešku
-            if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij učitano poruku ako se dogodi greška parsiranja
-            if (duplicateWarning) duplicateWarning.style.display = 'none';
+            // Možda bi se i ovdje mogao dodati error sound/message? Trenutno nema zahtjeva za to.
+            // showTemporaryMessage(loadedMsg, "GREŠKA!", 1500); // Opcija: Prikaz poruke za opću grešku
+            // if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij učitano poruku ako se dogodi greška parsiranja (nije potrebno sa showTemporaryMessage)
+            if (duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning ako se dogodi greška parsiranja
         }
     }
 
@@ -781,6 +843,8 @@
         if (switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb dok kamera ne radi
         if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij overlay
         if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri init skenera
+        if (duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri init skenera
+
 
         checkSharePrompt();
         updateRunningTextVisibility();
@@ -911,6 +975,8 @@
         if(switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb kad se skener gasi
         if(cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij i overlay
         if(loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri gašenju skenera
+        if(duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri gašenju skenera
+
 
         const instanceToStop = html5QrCodeInstance;
         if (instanceToStop && isScannerActive) {
@@ -957,7 +1023,7 @@
          // Koristi SPREMLJENI popis availableCameras
          if (!availableCameras || availableCameras.length <= 1) {
               console.warn("Nema dostupnih kamera za odabir ili samo jedna (koristi se spremljena lista).");
-              showTemporaryMessage("Nema drugih kamera za odabir.", 1500);
+              showTemporaryMessage(loadedMsg, "Nema drugih kamera za odabir.", 1500); // Koristimo loadedMsg za ovu poruku
               cameraSelectionOverlay.style.display = 'none'; // Osiguraj da je skriven
               return;
          }
@@ -1005,7 +1071,7 @@
         const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY);
         if(selectedCameraId === currentActiveCameraId && isScannerActive) {
             console.log("Odabrana je već aktivna kamera, nema potrebe za restartom.");
-             showTemporaryMessage(`Kamera: ${cameraLabel || 'Već aktivna'}`, 1500); // Info poruka
+             showTemporaryMessage(loadedMsg, `Kamera: ${cameraLabel || 'Već aktivna'}`, 1500); // Koristimo loadedMsg za ovu poruku
             return;
         }
 
@@ -1013,7 +1079,7 @@
         localStorage.setItem(CAMERA_ID_KEY, selectedCameraId);
 
         // Restartaj skener
-        showTemporaryMessage(`Mijenjam na: ${cameraLabel || 'Kamera'}...`, 1000);
+        showTemporaryMessage(loadedMsg, `Mijenjam na: ${cameraLabel || 'Kamera'}...`, 1000); // Koristimo loadedMsg za ovu poruku
         stopScanner().finally(() => {
              console.log("Nakon stopScanner, pozivam initializeScanner za novu kameru.");
              // initializeScanner() će sada automatski odabrati spremljeni ID
@@ -1108,6 +1174,8 @@
             if (runningTextContainer) runningTextContainer.style.display = 'none';
             if (sharePromptOverlay) sharePromptOverlay.style.display = 'none';
             if(loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri ulasku u povijest
+            if(duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri ulasku u povijest
+
 
             // Uvijek renderiraj povijest za trenutni dan pri ulasku
             currentlyViewedDate = new Date();
@@ -1123,16 +1191,18 @@
     // (Ove funkcije ostaju nepromijenjene, osim dodanih logova za debugging ako zatreba)
     function clearDynamicHeaderContent() { if (historyDynamicHeaderContentDiv) { historyDynamicHeaderContentDiv.innerHTML = ''; } }
     function renderHistoryView(dateToShow = currentlyViewedDate) { console.log("renderHistoryView: Pokrenuto za datum:", dateToShow); previousHistoryViewState = 'day-view'; currentlyViewedDate = new Date(dateToShow); currentlyViewedDate.setHours(0,0,0,0); const punaPovijest = loadFullHistoryFromLocalStorage(); console.log("renderHistoryView: Učitana povijest iz localStorage:", punaPovijest); if (!historyContentDiv || !historyPageDiv || !historyDynamicHeaderContentDiv) { console.error("renderHistoryView: Kritični DOM elementi nedostaju!"); return; } clearDynamicHeaderContent(); const opcijeDana = { weekday: 'long' }; const opcijeDatuma = { day: '2-digit', month: '2-digit', year: 'numeric' }; let imeDana = currentlyViewedDate.toLocaleDateString('hr-HR', opcijeDana); imeDana = imeDana.charAt(0).toUpperCase() + imeDana.slice(1); const formatiraniDatum = currentlyViewedDate.toLocaleDateString('hr-HR', opcijeDatuma); const startOfDay = new Date(currentlyViewedDate); const endOfDay = new Date(currentlyViewedDate); endOfDay.setHours(23, 59, 59, 999); const sesijeZaPrikazaniDan = punaPovijest.filter(grupa => { const grupaDate = new Date(grupa.timestamp); return grupaDate >= startOfDay && grupaDate <= endOfDay; }); sesijeZaPrikazaniDan.sort((a, b) => a.timestamp - b.timestamp); const brojRacunaOvajDan = sesijeZaPrikazaniDan.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const ukupanIznosOvajDan = sesijeZaPrikazaniDan.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); const dateInfoDiv = document.createElement('div'); dateInfoDiv.id = 'history-date-info'; const currentViewDateStr = getISODateString(currentlyViewedDate); const hasOtherDays = punaPovijest.some(grupa => { const grupaDateStr = getISODateString(new Date(grupa.timestamp)); return grupaDateStr && grupaDateStr !== currentViewDateStr; }); dateInfoDiv.innerHTML = `<span style="font-weight: bold;">${imeDana}, ${formatiraniDatum}</span> <button id="history-view-toggle-btn" style="background-color: yellow; color: black; padding: 0.4em 0.8em; font-size: 0.9em; font-weight: bold;" ${!hasOtherDays ? 'disabled' : ''}>OSTALI DANI ></button>`; historyDynamicHeaderContentDiv.appendChild(dateInfoDiv); const historyViewToggleButton = dateInfoDiv.querySelector('#history-view-toggle-btn'); if (historyViewToggleButton) { const newHistoryViewToggleButton = historyViewToggleButton.cloneNode(true); historyViewToggleButton.parentNode.replaceChild(newHistoryViewToggleButton, historyViewToggleButton); if (!newHistoryViewToggleButton.disabled) { newHistoryViewToggleButton.addEventListener('click', () => { playSound('click-sound'); renderAllDaysView(); }); newHistoryViewToggleButton.style.cursor = 'pointer'; newHistoryViewToggleButton.style.opacity = '1'; } else { newHistoryViewToggleButton.style.cssText += ';cursor: not-allowed; opacity: 0.7;'; } } const summaryInfoDiv = document.createElement('div'); summaryInfoDiv.id = 'history-summary-info'; summaryInfoDiv.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${brojRacunaOvajDan}</span></span> <span style="font-weight: bold;">UKUPNO: ${ukupanIznosOvajDan.toFixed(2)} €</span>`; historyDynamicHeaderContentDiv.appendChild(summaryInfoDiv); const uputaHtml = `<p id="history-select-group-text" style="text-align: center; color: black; font-weight: bold; font-style: normal; margin-bottom: 1em; margin-top: 0.5em; font-size: 0.9em;">IZABERI SKEN ILI <button id="start-search-btn" style="background:none; border:none; padding:0; color:blue; text-decoration:underline; cursor:pointer; font-size:inherit; font-weight:bold;">(TRAŽI)</button></p>`; let sesijeHtml = '<ul id="scan-group-list" style="list-style: none; padding: 0; margin: 0;">'; if (sesijeZaPrikazaniDan.length === 0) { sesijeHtml += '<li style="text-align:center; color: grey; border: none; cursor: default; padding: 1em 0;"><i>Nema spremljenih skenova za ovaj dan.</i></li>'; } else { sesijeZaPrikazaniDan.forEach((sesija, index) => { sesijeHtml += generirajHtmlZaSpremljenuGrupu(sesija, index + 1); }); } sesijeHtml += '</ul>'; historyContentDiv.innerHTML = uputaHtml + sesijeHtml; if (sesijeZaPrikazaniDan.length > 0) { const clearDayButton = document.createElement('button'); clearDayButton.id = 'clear-day-btn'; clearDayButton.className = 'red-btn'; clearDayButton.style.margin = '2em auto 1em auto'; clearDayButton.style.display = 'block'; clearDayButton.innerText = 'IZBRIŠI OVAJ DAN'; historyContentDiv.appendChild(clearDayButton); clearDayButton.dataset.confirming = 'false'; const newClearDayBtn = clearDayButton.cloneNode(true); clearDayButton.parentNode.replaceChild(newClearDayBtn, clearDayButton); newClearDayBtn.addEventListener('click', () => {
-            // playSound('click-sound'); // Dodan klik zvuk na prvi klik
-            if (newClearDayBtn.dataset.confirming === 'false') {
+            if (newClearDayBtn.disabled) return;
+            if (newClearDayBtn.dataset.confirming !== 'true') { // Check if NOT already confirming
                 playSound('click-sound'); // Zvuk na prvi klik za potvrdu
                 newClearDayBtn.innerText = "Potvrdi Brisanje Dana?";
                 newClearDayBtn.classList.add('confirm-mode');
                 newClearDayBtn.dataset.confirming = 'true'; // Postavi confirming na true
             } else {
                 // Drugi klik - potvrda
+                // Nema click sound ovdje, remove-sound će svirati ako brisanje uspije
                 const dateToConfirmDelete = new Date(currentlyViewedDate);
-                deleteScansForDay(dateToConfirmDelete); // deleteScansForDay sadrži playSound('remove-sound')
+                deleteScansForDay(dateToConfirmDelete); // deleteScansForDay sadrži playSound('remove-sound') na uspjeh
+                // Stanje gumba će se resetirati globalnim klik handlerom ili pri renderu
             }
         });
         const dayParentPageClickHandler = (e) => {
@@ -1152,16 +1222,17 @@
         } const groupList = document.getElementById('scan-group-list'); if (groupList) { const newGroupList = groupList.cloneNode(true); groupList.parentNode.replaceChild(newGroupList, groupList); newGroupList.addEventListener('click', (e) => { const clickedLi = e.target.closest('li[data-timestamp]'); if (clickedLi && clickedLi.dataset.timestamp) { const timestamp = clickedLi.dataset.timestamp; const selectedGroup = punaPovijest.find(g => String(g.timestamp) === timestamp); if (selectedGroup) { playSound('click-sound'); previousHistoryViewState = 'day-view'; renderGroupDetailView(selectedGroup); } else { console.error("Nije pronađena grupa:", timestamp); alert("Greška otvaranja detalja."); } } }); } const searchBtn = document.getElementById('start-search-btn'); if(searchBtn) { const newSearchBtn = searchBtn.cloneNode(true); searchBtn.parentNode.replaceChild(newSearchBtn, searchBtn); newSearchBtn.addEventListener('click', startSearch); } console.log("renderHistoryView: Renderiranje završeno."); }
     function generirajHtmlZaSpremljenuGrupu(grupa, redniBroj) { const vrijemeSpremanja = new Date(grupa.timestamp); const satiSpremanja = vrijemeSpremanja.getHours().toString().padStart(2, '0'); const minuteSpremanja = vrijemeSpremanja.getMinutes().toString().padStart(2, '0'); const vrijemeSpremanjaFormatirano = `${satiSpremanja}:${minuteSpremanja}`; const ukupnoGrupa = grupa.racuni.reduce((sum, item) => sum + item.amount, 0); const zadnjeVrijeme = grupa.lastQrTime || '??:??'; const prikazNaziva = grupa.name ? `<span class="session-name-history">${grupa.name} U ${vrijemeSpremanjaFormatirano}</span>` : `<span class="scan-time-history">SKEN U ${vrijemeSpremanjaFormatirano}</span>`; return `<li data-timestamp="${grupa.timestamp}" style="background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background-color 0.2s ease;"><span style="flex-shrink: 0; display: inline-flex; align-items: center; min-width: 0; flex-grow: 1; overflow: hidden;"><span style="margin-right: 5px; flex-shrink: 0;">${redniBroj}.</span> ${prikazNaziva}</span><span class="scan-group-last-qr-time" style="flex-shrink: 0; margin-left: 15px;">${zadnjeVrijeme !== '??:??' ? 'zadnji iz ' + zadnjeVrijeme : ''}</span><span style="font-weight: bold; margin-left: auto; padding-left: 10px; flex-shrink: 0;">${ukupnoGrupa.toFixed(2)} €</span></span></li>`; }
     function renderGroupDetailView(groupData) { if (!historyContentDiv || !groupData || !groupData.racuni || !historyDynamicHeaderContentDiv) { console.error("Nedostaju podaci za detalje."); renderHistoryView(); return; } clearDynamicHeaderContent(); const sessionTimestamp = groupData.timestamp; const vrijemeSpremanja = new Date(sessionTimestamp); const satiSpremanja = vrijemeSpremanja.getHours().toString().padStart(2, '0'); const minuteSpremanja = vrijemeSpremanja.getMinutes().toString().padStart(2, '0'); const vrijemeSpremanjaFormatirano = `${satiSpremanja}:${minuteSpremanja}`; const ukupnoGrupa = groupData.racuni.reduce((sum, item) => sum + item.amount, 0); const brojRacunaSesije = groupData.racuni.length; const naslovDetalja = groupData.name ? groupData.name : `SKEN U ${vrijemeSpremanjaFormatirano}`; const detailHeaderDiv = document.createElement('div'); detailHeaderDiv.id = 'detail-header-info'; detailHeaderDiv.innerHTML = `<button id="back-to-group-list-btn" style="background-color: #6c757d; color: white; padding: 0.4em 0.8em; font-size: 0.9em; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">< Lista</button><h3 style="margin: 0; text-align: center; flex-grow: 1; font-size: 1.1em;">${naslovDetalja}</h3><span style="font-weight: bold; font-size: 1.1em; flex-shrink: 0; padding-left: 5px;">${ukupnoGrupa.toFixed(2)} €</span>`; historyDynamicHeaderContentDiv.appendChild(detailHeaderDiv); const detailSummaryDiv = document.createElement('div'); detailSummaryDiv.id = 'detail-summary-info'; detailSummaryDiv.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${brojRacunaSesije}</span></span><span style="font-weight: bold;">UKUPNO: ${ukupnoGrupa.toFixed(2)} €</span>`; historyDynamicHeaderContentDiv.appendChild(detailSummaryDiv); let detailListHtml = '<ul id="detail-scan-list">'; const racuniZaPrikaz = groupData.racuni; racuniZaPrikaz.forEach((racun, index) => { const vrijemeRacuna = racun.time !== '??:??' ? `${racun.time}` : 'Vrijeme?'; detailListHtml += `<li><span style="color: #333; min-width: 80px;">${index + 1}. ${vrijemeRacuna}</span><span style="font-weight: bold; margin-left: auto;">${racun.amount.toFixed(2)} €</span></li>`; }); detailListHtml += `</ul>`; detailListHtml += `<button id="delete-session-btn" class="red-btn" data-timestamp="${sessionTimestamp}" style="margin: 2em auto 1em auto; display: block;">IZBRIŠI OVAJ SKEN</button>`; historyContentDiv.innerHTML = detailListHtml; const backBtn = document.getElementById('back-to-group-list-btn'); if (backBtn) { const newBackBtn = backBtn.cloneNode(true); backBtn.parentNode.replaceChild(newBackBtn, backBtn); newBackBtn.addEventListener('click', () => { playSound('click-sound'); console.log("Vraćanje iz detalja, prethodno stanje:", previousHistoryViewState); switch (previousHistoryViewState) { case 'day-search-results': renderHistoryView(currentlyViewedDate); startSearch(); const searchInputDay = document.getElementById('search-input'); if(searchInputDay) searchInputDay.value = lastSearchTerm; executeSearch(); break; case 'all-days-search-results': renderAllDaysView(); const searchInputAll = document.getElementById('all-days-search-input'); if(searchInputAll) searchInputAll.value = lastSearchTerm; executeAllDaysSearch(); break; case 'day-view': default: renderHistoryView(currentlyViewedDate); break; } }); } const deleteSessionBtn = document.getElementById('delete-session-btn'); if(deleteSessionBtn) { deleteSessionBtn.dataset.confirming = 'false'; const newDeleteSessionBtn = deleteSessionBtn.cloneNode(true); deleteSessionBtn.parentNode.replaceChild(newDeleteSessionBtn, deleteSessionBtn); newDeleteSessionBtn.addEventListener('click', () => {
-            // playSound('click-sound'); // Dodan klik zvuk na prvi klik
-            if (newDeleteSessionBtn.dataset.confirming === 'false') {
+            if (newDeleteSessionBtn.dataset.confirming !== 'true') { // Check if NOT already confirming
                  playSound('click-sound'); // Zvuk na prvi klik za potvrdu
                  newDeleteSessionBtn.innerText = "Potvrdi brisanje?";
                  newDeleteSessionBtn.classList.add('confirm-mode');
                  newDeleteSessionBtn.dataset.confirming = 'true'; // Postavi confirming na true
              } else {
                  // Drugi klik - potvrda
+                 // Nema click sound ovdje, remove-sound će svirati ako brisanje uspije
                  const timestampToDelete = newDeleteSessionBtn.dataset.timestamp;
-                 deleteSpecificSession(timestampToDelete); // deleteSpecificSession sadrži playSound('remove-sound')
+                 deleteSpecificSession(timestampToDelete); // deleteSpecificSession sadrži playSound('remove-sound') na uspjeh
+                 // Stanje gumba će se resetirati globalnim klik handlerom ili pri renderu
              }
         });
         const detailClickHandler = (e) => {
@@ -1196,14 +1267,15 @@
          }
      } else { console.warn("Sesija za brisanje nije pronađena:", timestampToDelete); alert("Greška: Sken nije pronađen."); const deleteBtn = document.getElementById('delete-session-btn'); if(deleteBtn && deleteBtn.dataset.confirming === 'true') { deleteBtn.innerText = "IZBRIŠI OVAJ SKEN"; deleteBtn.classList.remove('confirm-mode'); deleteBtn.dataset.confirming = 'false'; } } }
     function renderAllDaysView() { previousHistoryViewState = 'all-days-view'; const punaPovijest = loadFullHistoryFromLocalStorage(); if (!historyContentDiv || !historyPageDiv || !historyDynamicHeaderContentDiv) return; clearDynamicHeaderContent(); const searchBarHtml = `<div id="all-days-search-container"><div style="display: flex; gap: 5px;"><input type="text" id="all-days-search-input" placeholder="UPIŠI ZA PRETRAGU..." style="flex-grow: 1; padding: 0.5em; font-size: 0.9em;"><button id="execute-all-days-search-btn" style="padding: 0.5em 0.6em; font-size: 0.9em;">Traži</button><button id="close-all-days-search-btn" style="padding: 0.5em 0.6em; background-color: #ccc; font-size: 0.9em;">Svi Dani</button></div></div><div id="all-days-summary-info" style="display: none;"></div>`; historyDynamicHeaderContentDiv.innerHTML = searchBarHtml; const resultsPlaceholderHtml = `<div id="search-results-all-days"><p style="text-align:center; color: grey; padding: 1em 0;"><i>Unesite pojam za pretragu ili kliknite "Svi Dani" za prikaz liste.</i></p></div>`; historyContentDiv.innerHTML = resultsPlaceholderHtml; const searchInput = document.getElementById('all-days-search-input'); const executeBtn = document.getElementById('execute-all-days-search-btn'); const closeBtn = document.getElementById('close-all-days-search-btn'); const searchResultsContainer = document.getElementById('search-results-all-days'); const allDaysSummaryContainer = document.getElementById('all-days-summary-info'); const sessionsByDate = punaPovijest.reduce((acc, session) => { const dateStr = getISODateString(new Date(session.timestamp)); if (!dateStr) return acc; if (!acc[dateStr]) { acc[dateStr] = { date: new Date(session.timestamp), sessions: [], totalAmount: 0, totalCount: 0 }; acc[dateStr].date.setHours(0, 0, 0, 0); } acc[dateStr].sessions.push(session); acc[dateStr].totalAmount += session.racuni.reduce((sum, item) => sum + item.amount, 0); acc[dateStr].totalCount += session.racuni.length; return acc; }, {}); const sortedDays = Object.values(sessionsByDate).sort((a, b) => b.date - a.date); if(searchInput && executeBtn && closeBtn && searchResultsContainer && allDaysSummaryContainer) { const newSearchInput = searchInput.cloneNode(true); searchInput.parentNode.replaceChild(newSearchInput, searchInput); newSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') executeAllDaysSearch(); }); const newExecuteBtn = executeBtn.cloneNode(true); executeBtn.parentNode.replaceChild(newExecuteBtn, executeBtn); newExecuteBtn.addEventListener('click', () => { executeAllDaysSearch(); }); const newCloseBtn = closeBtn.cloneNode(true); closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn); newCloseBtn.addEventListener('click', () => { playSound('click-sound'); newSearchInput.value = ''; renderAllDaysList(sortedDays, searchResultsContainer); const totalCountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const totalAmountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); allDaysSummaryContainer.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${totalCountAll}</span></span><span style="font-weight: bold;">UKUPNO: ${totalAmountAll.toFixed(2)} €</span>`; allDaysSummaryContainer.style.display = punaPovijest.length > 0 ? 'flex' : 'none'; }); } else { console.error("Nisu pronađeni svi elementi za pretragu u All Days View."); } if (punaPovijest.length > 0) { const backButtonHtml = `<button id="back-to-current-day-btn" style="background-color: #6c757d; color: white; margin-right: 10px; padding: 0.5em 1em; font-size: 1em;">< NATRAG</button>`; const clearAllButtonHtml = `<button id="clear-history-btn" class="red-btn" style="padding: 0.5em 1em; font-size: 1em;">IZBRIŠI SVU POVIJEST</button>`; const buttonsHtml = `<div style="text-align: center; margin-top: 1.5em; margin-bottom: 1em;">${backButtonHtml}${clearAllButtonHtml}</div>`; if (!document.getElementById('back-to-current-day-btn') && !document.getElementById('clear-history-btn')) { historyContentDiv.insertAdjacentHTML('beforeend', buttonsHtml); } const backToDayBtn = document.getElementById('back-to-current-day-btn'); if (backToDayBtn) { const newBackBtn = backToDayBtn.cloneNode(true); backToDayBtn.parentNode.replaceChild(newBackBtn, backToDayBtn); newBackBtn.addEventListener('click', () => { playSound('click-sound'); renderHistoryView(currentlyViewedDate); }); } const clearAllBtn = document.getElementById('clear-history-btn'); if (clearAllBtn) { if (punaPovijest.length === 0) { clearAllBtn.disabled = true; clearAllBtn.style.opacity = '0.6'; clearAllBtn.style.cursor = 'not-allowed'; } else { clearAllBtn.disabled = false; clearAllBtn.style.opacity = '1'; clearAllBtn.style.cursor = 'pointer'; } clearAllBtn.dataset.confirming = 'false'; const newClearAllBtn = clearAllBtn.cloneNode(true); clearAllBtn.parentNode.replaceChild(newClearAllBtn, clearAllBtn); newClearAllBtn.addEventListener('click', () => {
-            // playSound('click-sound'); // Dodan klik zvuk na prvi klik
-            if (newClearAllBtn.dataset.confirming === 'false') {
+            if (newClearAllBtn.disabled) return;
+            if (newClearAllBtn.dataset.confirming !== 'true') { // Check if NOT already confirming
                 playSound('click-sound'); // Zvuk na prvi klik za potvrdu
                 newClearAllBtn.innerText = "Potvrdi Brisanje SVEGA?";
                 newClearAllBtn.classList.add('confirm-mode');
                 newClearAllBtn.dataset.confirming = 'true'; // Postavi confirming na true
             } else {
                 // Drugi klik - potvrda
+                // Nema click sound ovdje, remove-sound će svirati ako brisanje uspije
                 localStorage.removeItem(HISTORY_STORAGE_KEY);
                 localStorage.removeItem(COUNTER_KEY);
                 localStorage.removeItem(COUNTER2_KEY);
@@ -1265,7 +1337,7 @@
         console.log("Visibility listener dodan.");
     }
 
-    // Modificirana globalClickListener da zatvori overlay
+    // Modificirana globalClickListener da zatvori overlay i resetira gumbe
     function globalClickListener(event) {
         // Zatvori popis kamera ako se klikne izvan njega i izvan gumba za promjenu kamere
         if (cameraSelectionOverlay && cameraSelectionOverlay.style.display === 'block') {
@@ -1277,9 +1349,53 @@
         }
 
         // Ostatak logike za resetiranje gumba
-        const isClickOnRemoveButton = removeButton && removeButton.contains(event.target); const isClickOnDeleteWarning = deleteWarningDiv && deleteWarningDiv.style.display !== 'none' && deleteWarningDiv.contains(event.target); if ((removeConfirm || removeNameConfirm) && !isClickOnRemoveButton && !isClickOnDeleteWarning) { resetRemoveMode(); }
-        const isClickOnOcistiButton = ocistiButton && ocistiButton.contains(event.target); if (ocistiConfirm && !isClickOnOcistiButton) { resetOcistiMode(); }
-        const isClickOnNameInput = sessionNameInput && sessionNameInput.contains(event.target); const isClickOnAddNameBtn = addNameBtn && addNameBtn.contains(event.target); const isClickOnEditIcon = event.target.classList.contains('edit-icon'); if (sessionNameInput && sessionNameInput.style.display === 'block' && !isClickOnNameInput && !isClickOnAddNameBtn && !isClickOnEditIcon) { saveName(); }
+        const isClickOnRemoveButton = removeButton && removeButton.contains(event.target);
+        const isClickOnOcistiButton = ocistiButton && ocistiButton.contains(event.target);
+        const isClickOnNameInput = sessionNameInput && sessionNameInput.contains(event.target);
+        const isClickOnAddNameBtn = addNameBtn && addNameBtn.contains(event.target);
+        const isClickOnEditIcon = event.target.classList.contains('edit-icon');
+        const isClickOnDeleteWarning = deleteWarningDiv && deleteWarningDiv.style.display !== 'none' && deleteWarningDiv.contains(event.target);
+
+        // Reset Remove button if in confirm mode and clicked outside
+        if ((removeConfirm || removeNameConfirm) && !isClickOnRemoveButton && !isClickOnDeleteWarning) {
+            resetRemoveMode();
+        }
+
+        // Reset Ocisti button if in confirm mode and clicked outside
+        if (ocistiConfirm && !isClickOnOcistiButton) {
+            resetOcistiMode();
+        }
+
+        // Save name if input is visible and clicked outside
+        if (sessionNameInput && sessionNameInput.style.display === 'block' && !isClickOnNameInput && !isClickOnAddNameBtn && !isClickOnEditIcon) {
+            saveName();
+        }
+
+        // Reset History Delete Buttons if in confirm mode and clicked outside
+        // (These are handled by specific handlers added in render functions, but global catch is good)
+        // Note: Handlers attached within render functions are likely sufficient if they use `event.stopPropagation()` or check `event.target`
+        // However, adding explicit checks here provides a fallback.
+        const clearDayBtn = document.getElementById('clear-day-btn');
+        if (clearDayBtn && clearDayBtn.dataset.confirming === 'true' && !clearDayBtn.contains(event.target)) {
+             clearDayBtn.innerText = "IZBRIŠI OVAJ DAN";
+             clearDayBtn.classList.remove('confirm-mode');
+             clearDayBtn.dataset.confirming = 'false';
+             console.log("Resetirao clearDayBtn iz global click");
+        }
+         const deleteSessionBtn = document.getElementById('delete-session-btn');
+         if (deleteSessionBtn && deleteSessionBtn.dataset.confirming === 'true' && !deleteSessionBtn.contains(event.target)) {
+              deleteSessionBtn.innerText = "IZBRIŠI OVAJ SKEN";
+              deleteSessionBtn.classList.remove('confirm-mode');
+              deleteSessionBtn.dataset.confirming = 'false';
+              console.log("Resetirao deleteSessionBtn iz global click");
+         }
+         const clearAllBtn = document.getElementById('clear-history-btn');
+         if (clearAllBtn && clearAllBtn.dataset.confirming === 'true' && !clearAllBtn.contains(event.target)) {
+              clearAllBtn.innerText = "IZBRIŠI SVU POVIJEST";
+              clearAllBtn.classList.remove('confirm-mode');
+              clearAllBtn.dataset.confirming = 'false';
+              console.log("Resetirao clearAllBtn iz global click");
+         }
     }
 
 
@@ -1321,7 +1437,7 @@
         cameraListUl = document.getElementById('camera-list');
 
         // Provjera osnovnih elemenata (uključujući nove)
-        if (!readerDiv || !historyPageDiv || !historyContentDiv || !backToScannerButton || !historyToggleButton || !sessionNameContainer || !historyStickyHeaderDiv || !historyDynamicHeaderContentDiv || !runningTextContainer || !sharePromptOverlay || !counterDeactivatedIndicator || !loadedMsg || !switchCameraButton || !cameraSelectionOverlay || !cameraListUl ) {
+        if (!readerDiv || !historyPageDiv || !historyContentDiv || !backToScannerButton || !historyToggleButton || !sessionNameContainer || !historyStickyHeaderDiv || !historyDynamicHeaderContentDiv || !runningTextContainer || !sharePromptOverlay || !counterDeactivatedIndicator || !loadedMsg || !duplicateWarning || !switchCameraButton || !cameraSelectionOverlay || !cameraListUl ) {
             console.error("GREŠKA: Nedostaju DOM elementi!");
             document.body.innerHTML = '<div style="padding: 20px; color: red; font-weight: bold;">Greška učitavanja. Osvježite.</div>';
             return;
@@ -1366,7 +1482,7 @@
                             console.log('Korisnik odustao od dijeljenja (AbortError). Brojač NIJE resetiran ovdje.');
                         } else {
                              console.log('Došlo je do druge greške pri dijeljenju. Brojač NIJE resetiran ovdje.');
-                             showTemporaryMessage("Dijeljenje neuspješno.", 1500);
+                             showTemporaryMessage(loadedMsg, "Dijeljenje neuspješno.", 1500); // Koristimo loadedMsg za ovu poruku
                         }
                     } finally {
                         // Ovdje možemo provjeriti brojač i prompt NAKON pokušaja dijeljenja
@@ -1425,7 +1541,7 @@
                     localStorage.removeItem(UNSAVED_COUNT_KEY);
                     localStorage.removeItem(UNSAVED_AMOUNT_KEY);
                     // Ime sesije se NE briše, ono ostaje u currentSessionName
-                    console.log("Obrisano nesačuvanog stanja (broj/ukupno) nakon čitanja za log.");
+                    console.log("Obrisano nesačivanog stanja (broj/ukupno) nakon čitanja za log.");
                 } else {
                     console.log("Nema validne nesačuvane sesije za logovanje ili prazna.", unsavedCount, unsavedAmount);
                     // Ipak obriši nevalidne ili prazne vrijednosti
@@ -1481,3 +1597,16 @@
 
 </body>
 </html>
+```
+
+Testirajte ovaj kod na vašem serveru (GitHub Pages). Posvetite pažnju na:
+
+*   Zvuk i poruku kod uspješnog skeniranja novog računa.
+*   Zvuk i poruku kada odmah nakon uspješnog skeniranja pokušate skenirati isti račun.
+*   Zvuk i poruku kada pokušate skenirati duplikat koji je već u memoriji ili nedavno spremljen, a prošlo je više od 2 sekunde od zadnjeg uspješnog skeniranja.
+*   Zvuk kod prvog i drugog klika na gumb "SPREMI I OČISTI".
+*   Zvukovi kod brisanja stavki, dana i cijele povijesti.
+*   Zvukovi kod ostalih klikova i navigacije.
+*   Logika potvrde brisanja u povijesti (da se briše tek na drugi klik).
+
+Nadam se da ovaj put sve radi kako treba! Ako se pojave još neke nejasnoće ili problemi, tu sam.

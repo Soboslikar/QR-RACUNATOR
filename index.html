@@ -543,7 +543,7 @@ function normalizeDateForSearch(input) {
         }
     }
     function updateRunningText() { if (runningTextSpan) { runningTextSpan.textContent = tekstPoruka; } updateRunningTextVisibility(); }
-    function updateRunningTextVisibility() { const shouldShowText = tekstPoruka && (!sharePromptOverlay || sharePromptOverlay.style.display === 'none') && document.body.classList.contains('scanner-view'); if (runningTextContainer) { runningTextContainer.style.display = shouldShowText ? 'block' : 'none'; if (shouldShowText && runningTextSpan) { runningTextSpan.style.animation = 'none'; runningTextSpan.offsetHeight; runningTextSpan.style.animation = ''; } } }
+    function updateRunningTextVisibility() { const shouldShowText = tekstPoruka && (!sharePromptOverlay || sharePromptOverlay.style.display === 'none') && document.body.classList.contains('scanner-view'); if (runningTextContainer) { runningTextContainer.style.display = shouldShowText ? 'block' : 'none;'; if (shouldShowText && runningTextSpan) { runningTextSpan.style.animation = 'none'; runningTextSpan.offsetHeight; runningTextSpan.style.animation = ''; } } }
     function checkSharePrompt() { const shouldShowPrompt = brojac === 0 && brojac2 > 0 && document.body.classList.contains('scanner-view'); if (sharePromptOverlay) { sharePromptOverlay.style.display = shouldShowPrompt ? 'flex' : 'none'; updateRunningTextVisibility(); } }
     function updateDeactivatedIndicator() { if (counterDeactivatedIndicator) { counterDeactivatedIndicator.style.display = (!isCounterDecrementActive && document.body.classList.contains('scanner-view')) ? 'block' : 'none'; } }
 
@@ -915,9 +915,10 @@ function normalizeDateForSearch(input) {
                             instructionDiv.style.display = 'block';
                         }
                         // Listener za promjenu vidljivosti dodajemo SAMO ako je bio uspješan start
-                        if (!visibilityListenerAttached) {
-                            attachVisibilityListener();
-                        }
+                        // Maknuto ovdje jer se listener dodaje globalno rano.
+                        // if (!visibilityListenerAttached) {
+                        //     attachVisibilityListener();
+                        // }
                     }, 50); // Kraća pauza
                 }).catch(err => {
                     console.error(`>>> [InitializeScanner][rAF] start() FAILED za kameru ${deviceId}:`, err);
@@ -1062,7 +1063,10 @@ function normalizeDateForSearch(input) {
             if (!isScannerActive) {
                 console.log("switchToScannerView: Skener nije aktivan, inicijaliziram...");
                  // initializeScanner će automatski provjeriti history view i isScannerActive
-                initializeScanner();
+                 // Pozivamo ga s odgodom, isto kao pri povratku iz povijesti
+                 setTimeout(() => {
+                      initializeScanner();
+                 }, 250); // 250 milisekundi odgode
             } else {
                 console.log("switchToScannerView: Skener je već aktivan. Ažuriram UI.");
                 checkSharePrompt();
@@ -1072,11 +1076,11 @@ function normalizeDateForSearch(input) {
                 if (switchCameraButton && availableCameras && availableCameras.length > 1) {
                    switchCameraButton.style.display = 'block';
                 }
-                 // Uvijek attachaj listener kad se prelazi u scanner view, ako već nije
-                if (!visibilityListenerAttached) {
-                    attachVisibilityListener();
-                }
             }
+            // Visibility listener se dodaje globalno rano, nema potrebe ovdje
+            // if (!visibilityListenerAttached) {
+            //     attachVisibilityListener();
+            // }
             return;
         }
 
@@ -1108,11 +1112,10 @@ function normalizeDateForSearch(input) {
              }, 250); // 250 milisekundi bi trebalo biti dovoljno
         });
 
-        // Attach visibility listener čim kreneš u scanner view (ako već nije)
-        // Iako initializeScanner to radi, ovo je sigurnosni sloj
-        if (!visibilityListenerAttached) {
-             attachVisibilityListener();
-        }
+        // Visibility listener se dodaje globalno rano, nema potrebe ovdje
+        // if (!visibilityListenerAttached) {
+        //      attachVisibilityListener();
+        // }
 
         console.log("switchToScannerView: Završeno (startanje skenera ide asinkrono).");
     }
@@ -1122,7 +1125,7 @@ function normalizeDateForSearch(input) {
         console.log("switchToHistoryView: Pokrenuto.");
         if (document.body.classList.contains('history-view')) {
             console.log("switchToHistoryView: Već u history view, samo renderiram.");
-            renderHistoryView(currentlyViewedDate); // Možda treba zadržati zadnji prikaz? Ovisi o želji. Trenutno vraća na današnji dan.
+            renderHistoryView(currentlyViewadDate); // Možda treba zadržati zadnji prikaz? Ovisi o želji. Trenutno vraća na današnji dan.
             return;
         }
 
@@ -1291,24 +1294,37 @@ function normalizeDateForSearch(input) {
 
 
     // *** EVENT LISTENERI ***
-    // Modificirana handleVisibilityChange
+    // handleVisibilityChange - Modified
      function handleVisibilityChange() {
+        console.log(`Visibility change: ${document.visibilityState}. isScannerActive: ${isScannerActive}. body class: ${document.body.classList}`);
+        // Only attempt to initialize/restart scanner if tab becomes visible AND we are in scanner view
         if (document.visibilityState === 'visible' && document.body.classList.contains('scanner-view')) {
-             console.log("Aplikacija postala vidljiva u Scanner View. Inicijaliziram skener (ako nije aktivan).");
-            // initializeScanner() provjerava je li već aktivan i pokreće se samo ako nije
-            initializeScanner();
-        } else if (document.visibilityState === 'hidden') {
+             console.log("Aplikacija postala vidljiva u Scanner View. Provjeravam skener.");
+             // initializeScanner() provjerava je li već aktivan i pokreće se samo ako nije
+             // Dodajemo malu odgodu i ovdje prije ponovnog pokretanja, slično kao kod switcha
+             setTimeout(() => {
+                 console.log("handleVisibilityChange: Pokrećem initializeScanner() s odgodom nakon postanka vidljivim.");
+                 initializeScanner(); // initializeScanner ima interne provjere
+             }, 250); // Mala odgoda i ovdje
+        } else if (document.visibilityState === 'hidden' && isScannerActive) {
              console.log("Aplikacija postala nevidljiva, zaustavljam skener.");
-            stopScanner(); // Zaustavi skener kad tab nije vidljiv
+             stopScanner(); // Zaustavi skener kad tab nije vidljiv
+        } else if (document.visibilityState === 'hidden' && !isScannerActive) {
+            console.log("Aplikacija postala nevidljiva, skener već nije aktivan.");
         }
-    };
+     };
 
-    function attachVisibilityListener() {
-        if (visibilityListenerAttached) return;
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        visibilityListenerAttached = true;
-        console.log("Visibility listener dodan.");
-    }
+     function attachVisibilityListener() {
+         // Attach only once
+         if (!visibilityListenerAttached) {
+             document.addEventListener("visibilitychange", handleVisibilityChange);
+             visibilityListenerAttached = true;
+             console.log("Visibility listener dodan.");
+         } else {
+             console.log("Visibility listener već dodan.");
+         }
+     }
+
 
     // Modificirana globalClickListener da zatvori overlay i resetira gumbe
     function globalClickListener(event) {
@@ -1417,10 +1433,14 @@ function normalizeDateForSearch(input) {
         }
 
 
-        // Globalni listener i listeneri za gumbe
+        // Globalni listener (uključuje klikove za zatvaranje overlay-a i resetiranje gumba)
         document.body.addEventListener('click', globalClickListener, true);
 
-        // Listener za gumb POVIJEST
+        // Attach visibility listener rano
+        attachVisibilityListener(); // Attach once on DOM ready
+
+        // Listeneri za gumbe i inpute
+        // ... listeneri ostaju isti ...
         if (historyToggleButton) {
              const newHistoryToggleButton = historyToggleButton.cloneNode(true);
              historyToggleButton.parentNode.replaceChild(newHistoryToggleButton, historyToggleButton);
@@ -1501,24 +1521,22 @@ function normalizeDateForSearch(input) {
         // 2. Inicijalizuj UserID i FirstUseTimestamp
         initializeUserTracking();
         // 3. Napravi inicijalni update prikaza (ukupno, broj računa, ime sesije)
-        // Povijest (mala lista) će se ažurirati unutar updateDisplay ako je scanner-view
-        updateDisplay();
-        // 4. Provjeri view i pokreni inicijalizaciju skenera ILI rendiranje povijesti
+        updateDisplay(); // Ažurira UI koji NE ovisi o skeneru
+
+        // 4. Pokreni inicijalizaciju skenera ILI rendiranje povijesti *S ODGODOM ILI ODMAH*
         console.log("Provjeravam inicijalni view...");
         if (document.body.classList.contains('scanner-view')) {
-            console.log("Init: Scanner view - Pokrećem inicijalizaciju skenera...");
-             // initializeScanner sada dohvaća i sprema popis kamera, te starta skener.
-             // Također postavlja isScannerActive i prikazuje gumb kamere ako treba.
-            initializeScanner();
-            // Visibility listener attachaj čim kreneš u scanner view
-            attachVisibilityListener();
+            console.log("Init: Scanner view. Pokrećem initializeScanner() s odgodom.");
+            // Dodana odgoda PRIJE prvog poziva initializeScanner na startu
+            setTimeout(() => {
+                initializeScanner(); // initializeScanner sada ima internu logiku odabira kamere i startanja
+            }, 500); // Neka bude malo duža odgoda za početak, npr. 500ms
         } else {
-            console.log("Init: History view - Renderiram povijest.");
-            renderHistoryView(currentlyViewedDate);
-            // Nema potrebe za visibility listenerom u history view
+            console.log("Init: History view - Renderiram povijest odmah.");
+            renderHistoryView(currentlyViewedDate); // Renderiraj odmah ako nije scanner view
         }
-        // 5. Pokreni dohvaćanje podataka iz Sheeta u pozadini
-        // Callback dohvaćanja podataka ažurira UI elemente koji ovise o podacima iz Sheeta
+
+        // 5. Pokreni dohvaćanje podataka iz Sheeta u pozadini (ostaje isto)
         fetchSheetData().then(() => {
             console.log("Sheet podaci dohvaćeni. Pripremam 'app_loaded' log.");
             let previousSessionDetails = null;
@@ -1553,7 +1571,7 @@ function normalizeDateForSearch(input) {
                  renderHistoryView(currentlyViewedDate);
              } else {
                  console.log("Ažuriram UI skenera nakon dohvaćanja podataka.");
-                 // UI specifičan za skener (poput gumba kamere) se ažurira u initializeScanner
+                 // UI specifičan za skener (poput gumba kamere) se ažurira unutar initializeScanner
              }
             console.log("Inicijalizacija (pozadinska obrada) završena.");
         }).catch(error => {
@@ -1572,7 +1590,7 @@ function normalizeDateForSearch(input) {
              if (document.body.classList.contains('history-view')) { renderHistoryView(currentlyViewedDate); }
              // Skener UI će biti ažuriran unutar initializeScanner ako je bio aktivan
         });
-        console.log("Osnovna inicijalizacija završena (dohvaćanje ide u pozadini).");
+        console.log("Osnovna inicijalizacija završena (skener/povijest i dohvaćanje idu asinkrono).");
     }); // Kraj DOMContentLoaded
     console.log(">>> KRAJ SKRIPTE <<<");
   </script>

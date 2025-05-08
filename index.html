@@ -95,7 +95,7 @@
          font-size: 1.2em; /* Povećana veličina fonta */
          padding: 0.3em 0.5em;
          border: 1px solid #ccc;
-         border-radius: 3px;
+         border-radius: 4px;
          /* max-width: 150px; REMOVED */
          width: 100%; /* Neka zauzme sav dostupan prostor unutar wrappera */
          display: none;
@@ -509,6 +509,7 @@
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     // AŽURIRAN URL S NOVIM KOJI SI POSLAO
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // Ažuriran URL
+    const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // OSIGURANO DA JE GLOBALNO DEFINIRANO
 
     let ukupno = 0;
     let povijest = [];
@@ -721,7 +722,7 @@ function normalizeDateForSearch(input) {
     // Funkcija za slanje log podataka
     async function sendLogData(eventData) {
       // console.log("Pokušavam poslati log:", eventData.Event); // KOMENTIRANO: Previše logova
-      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA/exec') { // Dodana provjera za placeholder i stari URL
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL koji je uzrokovao "Failed to fetch"
           console.warn("Logovanje onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
           return;
       }
@@ -763,7 +764,7 @@ function normalizeDateForSearch(input) {
     function saveCounterActiveState() { localStorage.setItem(COUNTER_ACTIVE_KEY, isCounterDecrementActive); }
 
     // *** FUNKCIJE ZA DOHVAĆANJE PODATAKA IZ SHEETA ***
-    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA/exec') { // Dodana provjera za placeholder i stari URL
+    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL
          console.warn("Dohvaćanje iz Sheeta onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
          tekstPoruka = "";
          initializeCounters();
@@ -1185,66 +1186,8 @@ function normalizeDateForSearch(input) {
 
     function isElementOrParentHidden(element) { if (!element) return true; while (element && element !== document.body) { if (window.getComputedStyle(element).display === 'none') return true; element = element.parentElement; } return false; }
 
-    // Modificirana initializeScanner funkcija
-    function initializeScanner() {
-        if (document.body.classList.contains('history-view') || isScannerActive) {
-             // console.log("[InitializeScanner] Nema potrebe za pokretanjem (history view ili već aktivno)."); // KOMENTIRANO: Previše logova
-             // Ako je već aktivan i u scanner view, samo provjeri prikaz gumba kamere
-             if (isScannerActive && document.body.classList.contains('scanner-view')) {
-                 if (switchCameraButton && availableCameras.length > 1) {
-                      switchCameraButton.style.display = 'block';
-                 }
-             }
-             return;
-        }
-        console.log("[InitializeScanner] Pokrećem..."); // Ostavljen ovaj log
-        if (readerDiv) readerDiv.innerHTML = ''; // Očisti prethodne poruke/video
-        if (instructionDiv) instructionDiv.style.display = 'none'; // Sakrij uputu dok se ne pokrene
-        if (switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb dok kamera ne radi
-        if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij overlay
-        if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri init skenera
-        if (duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri init skenera
-        // Sakrij modal za ručni unos ako je otvoren
-         if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') {
-             hideManualEntryModal(); // Sakrij bez zvuka otkazivanja
-         }
-
-
-        checkSharePrompt(); // Ažuriraj prikaz share prompta
-        updateRunningTextVisibility(); // Ažuriraj prikaz teksta koji trči
-        updateDeactivatedIndicator(); // Ažuriraj prikaz indikatora deaktivacije
-
-        // Kreiraj novu instancu svaki put kad se pokreće
-        html5QrCodeInstance = new Html5Qrcode("reader");
-        const qrConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-        // Dohvati kamere SAMO jednom pri prvoj inicijalizaciji (ili ako lista nije napunjena)
-         if (availableCameras.length === 0) {
-             console.log("Dohvaćam popis kamera prvi put..."); // Ostavljen ovaj log
-             Html5Qrcode.getCameras().then(devices => {
-                 console.log("Dostupne kamere (inicijalno dohvatio):", devices); // Ostavljen ovaj log
-                 availableCameras = devices; // <--- SPREMI POPIS KAMERA
-                 startScannerWithCameraSelection(devices, qrConfig); // Proslijedi popis
-             }).catch(err => {
-                 // Ova greška se događa ako getCameras() faila na početku
-                 console.error("Greška dohvaćanja kamera ili inicijalizacije (getCameras failed):", err); // Ostavljen log greške
-                 isScannerActive = false;
-                 availableCameras = []; // <--- Postavi na prazan niz ako getCameras faila
-                 if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška pristupa kamerama (${err.name || err.message || err}). Provjerite dozvole.</div>`;
-                 if (instructionDiv) instructionDiv.style.display = 'none';
-                 if (switchCameraButton) switchCameraButton.style.display = 'none'; // Nema kamera, nema gumba
-                 html5QrCodeInstance = null;
-
-                 // Logiranje greške getCameras
-                 sendLogData({ Event: 'get_cameras_failed', Details: { errorName: err.name, errorMessage: err.message } });
-             });
-         } else {
-             console.log("Koristim već dohvaćeni popis kamera:", availableCameras); // Ostavljen ovaj log
-             startScannerWithCameraSelection(availableCameras, qrConfig); // Koristi postojeći popis
-         }
-    };
-
     // NOVO: Izdvojena logika za odabir i start kamere nakon što su kamere dohvaćene
+    // OVA FUNKCIJA TREBA BITI GLOBALNO DEFINIRANA (IZVAN DRUGIH FUNKCIJA)
     function startScannerWithCameraSelection(devices, qrConfig) {
         if (!devices || devices.length === 0) {
              if (readerDiv) readerDiv.innerHTML = '<div style="padding: 20px; color: red;">Nema dostupnih kamera na uređaju.</div>';
@@ -1257,7 +1200,7 @@ function normalizeDateForSearch(input) {
         }
 
         let selectedCameraId = null;
-        const savedCameraId = localStorage.getItem(CAMERA_ID_KEY);
+        const savedCameraId = localStorage.getItem(CAMERA_ID_KEY); // Koristi GLOBALNU konstantu CAMERA_ID_KEY
 
         // 1. Provjeri spremljenu kameru
         if (savedCameraId) {
@@ -1326,7 +1269,7 @@ function normalizeDateForSearch(input) {
                 console.log(`>>> [startScannerWithCameraSelection][rAF] start() OK za kameru: ${finalCameraId}`); // Ostavljen ovaj log
                 isScannerActive = true;
                 // Spremi ID *uspješno pokrenute* kamere
-                localStorage.setItem(CAMERA_ID_KEY, finalCameraId);
+                localStorage.setItem(CAMERA_ID_KEY, finalCameraId); // Koristi GLOBALNU konstantu CAMERA_ID_KEY
                 console.log("Spremljen ID aktivne kamere u localStorage:", finalCameraId); // Ostavljen ovaj log
 
                 // Pokaži gumb za promjenu tek kad je kamera uspješno startala I ima više od jedne dostupne
@@ -1362,6 +1305,66 @@ function normalizeDateForSearch(input) {
             });
         });
     }
+
+
+    // Modificirana initializeScanner funkcija (POZIVA startScannerWithCameraSelection NAKON DOHVAĆANJA KAMERA)
+    function initializeScanner() {
+        if (document.body.classList.contains('history-view') || isScannerActive) {
+             // console.log("[initializeScanner] Nema potrebe za pokretanjem (history view ili već aktivno)."); // KOMENTIRANO: Previše logova
+             // Ako je već aktivan i u scanner view, samo provjeri prikaz gumba kamere
+             if (isScannerActive && document.body.classList.contains('scanner-view')) {
+                 if (switchCameraButton && availableCameras.length > 1) {
+                      switchCameraButton.style.display = 'block';
+                 }
+             }
+             return;
+        }
+        console.log("[initializeScanner] Pokrećem..."); // Ostavljen ovaj log
+        if (readerDiv) readerDiv.innerHTML = ''; // Očisti prethodne poruke/video
+        if (instructionDiv) instructionDiv.style.display = 'none'; // Sakrij uputu dok se ne pokrene
+        if (switchCameraButton) switchCameraButton.style.display = 'none'; // Sakrij gumb dok kamera ne radi
+        if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij overlay
+        if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri init skenera
+        if (duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri init skenera
+        // Sakrij modal za ručni unos ako je otvoren
+         if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') {
+             hideManualEntryModal(); // Sakrij bez zvuka otkazivanja
+         }
+
+
+        checkSharePrompt(); // Ažuriraj prikaz share prompta
+        updateRunningTextVisibility(); // Ažuriraj prikaz teksta koji trči
+        updateDeactivatedIndicator(); // Ažuriraj prikaz indikatora deaktivacije
+
+        // Kreiraj novu instancu svaki put kad se pokreće
+        html5QrCodeInstance = new Html5Qrcode("reader");
+        const qrConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        // Dohvati kamere SAMO jednom pri prvoj inicijalizaciji (ili ako lista nije napunjena)
+         if (availableCameras.length === 0) {
+             console.log("[initializeScanner] Dohvaćam popis kamera prvi put..."); // Ostavljen ovaj log
+             Html5Qrcode.getCameras().then(devices => {
+                 console.log("[initializeScanner] Dostupne kamere (inicijalno dohvatio):", devices); // Ostavljen ovaj log
+                 availableCameras = devices; // <--- SPREMI POPIS KAMERA
+                 startScannerWithCameraSelection(devices, qrConfig); // Proslijedi popis i pokreni skener
+             }).catch(err => {
+                 // Ova greška se događa ako getCameras() faila na početku
+                 console.error("[initializeScanner] Greška dohvaćanja kamera (getCameras failed):", err); // Ostavljen log greške
+                 isScannerActive = false;
+                 availableCameras = []; // <--- Postavi na prazan niz ako getCameras faila
+                 if (readerDiv) readerDiv.innerHTML = `<div style="padding: 20px; color: red;">Greška pristupa kamerama (${err.name || err.message || err}). Provjerite dozvole.</div>`;
+                 if (instructionDiv) instructionDiv.style.display = 'none';
+                 if (switchCameraButton) switchCameraButton.style.display = 'none'; // Nema kamera, nema gumba
+                 html5QrCodeInstance = null;
+
+                 // Logiranje greške getCameras
+                 sendLogData({ Event: 'get_cameras_failed', Details: { errorName: err.name, errorMessage: err.message } });
+             });
+         } else {
+             console.log("[initializeScanner] Koristim već dohvaćeni popis kamera:", availableCameras); // Ostavljen ovaj log
+             startScannerWithCameraSelection(availableCameras, qrConfig); // Koristi postojeći popis i pokreni skener
+         }
+    };
 
 
     // Modificirana stopScanner funkcija
@@ -1443,7 +1446,7 @@ function normalizeDateForSearch(input) {
 
          // Inače, koristi spremljeni popis kamera i prikaži ih
          cameraListUl.innerHTML = ''; // Očisti prethodni popis
-         const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY);
+         const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY); // Koristi GLOBALNU konstantu
 
          availableCameras.forEach(device => {
              const listItem = document.createElement('li');
@@ -1474,7 +1477,7 @@ function normalizeDateForSearch(input) {
              cameraSelectionOverlay.style.display = 'none'; // Sakrij popis
         }
 
-        const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY);
+        const currentActiveCameraId = localStorage.getItem(CAMERA_ID_KEY); // Koristi GLOBALNU konstantu
         if(selectedCameraId === currentActiveCameraId && isScannerActive) {
             console.log("Odabrana je već aktivna kamera, nema potrebe za restartom."); // Ostavljen ovaj log
              showTemporaryMessage(loadedMsg, `Kamera: ${cameraLabel || 'Već aktivna'}`, 1500); // Koristimo loadedMsg za ovu poruku
@@ -1484,7 +1487,7 @@ function normalizeDateForSearch(input) {
         }
 
         // Spremi novi odabir PRIJE restartanja
-        localStorage.setItem(CAMERA_ID_KEY, selectedCameraId);
+        localStorage.setItem(CAMERA_ID_KEY, selectedCameraId); // Koristi GLOBALNU konstantu
         sendLogData({ Event: 'camera_switch_attempt', Details: { cameraId: selectedCameraId, label: cameraLabel } }); // Log pokušaja
 
         // Restartaj skener

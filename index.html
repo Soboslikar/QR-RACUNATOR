@@ -510,7 +510,7 @@
     const COUNTER2_KEY = 'qrCalculatorCounter2';
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     // AŽURIRAN URL S NOVIM KOJI SI POSLAO
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // Ažuriran URL
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
     const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // OSIGURANO DA JE GLOBALNO DEFINIRANO
 
     let ukupno = 0;
@@ -724,7 +724,7 @@ function normalizeDateForSearch(input) {
     // Funkcija za slanje log podataka
     async function sendLogData(eventData) {
       // console.log("Pokušavam poslati log:", eventData.Event); // KOMENTIRANO: Previše logova
-      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL koji je uzrokovao "Failed to fetch" - Ispravljam URL u gornjim konstantama
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL
           console.warn("Logovanje onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
           return;
       }
@@ -766,7 +766,7 @@ function normalizeDateForSearch(input) {
     function saveCounterActiveState() { localStorage.setItem(COUNTER_ACTIVE_KEY, isCounterDecrementActive); }
 
     // *** FUNKCIJE ZA DOHVAĆANJE PODATAKA IZ SHEETA ***
-    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL - Ispravljam URL u gornjim konstantama
+    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL
          console.warn("Dohvaćanje iz Sheeta onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
          tekstPoruka = "";
          initializeCounters();
@@ -878,7 +878,7 @@ function normalizeDateForSearch(input) {
             updateDeactivatedIndicator(); // Ažuriraj indikator
             sessionNameInput.value = '';
             sessionNameInput.style.display = 'none';
-            updateNameDisplay(); // Sakrij input, prikaži gumb "Dodaj Naziv"
+            updateNameDisplay(); // Sakrij input, prikaži gumb "DODAJ NAZIV"
             checkRemoveButtonVisibility();
             // Dodano: Ukloni "obriši naziv?" state ako je bio aktivan
             if(removeNameConfirm) resetRemoveMode();
@@ -896,7 +896,7 @@ function normalizeDateForSearch(input) {
             updateDeactivatedIndicator(); // Ažuriraj indikator
             sessionNameInput.value = '';
             sessionNameInput.style.display = 'none';
-            updateNameDisplay(); // Sakrij input, prikaži gumb "Dodaj Naziv"
+            updateNameDisplay(); // Sakrij input, prikaži gumb "DODAJ NAZIV"
             checkSharePrompt();
             updateRunningTextVisibility();
             checkRemoveButtonVisibility();
@@ -1787,7 +1787,7 @@ function normalizeDateForSearch(input) {
                 // Nema click sound ovdje, remove-sound će svirati ako brisanje uspije
                 const dateToConfirmDelete = new Date(currentlyViewedDate);
                 deleteScansForDay(dateToConfirmDelete); // deleteScansForDay sadrži playSound('remove-sound') na uspjeh i log
-                // Stanje gumba će se resetirati globalnim klik handlerom ili pri renderu
+                // Stanje gumbš će se resetirati globalnim klik handlerom ili pri renderu
             }
         });
         const dayParentPageClickHandler = (e) => {
@@ -2118,7 +2118,7 @@ function normalizeDateForSearch(input) {
                              try { localStorage.setItem(UNSAVED_COUNT_KEY, povijest.length); localStorage.setItem(UNSAVED_AMOUNT_KEY, ukupno); } catch (lsError) { console.error("Greška spremanja uvezenog nesačivanog stanja u localStorage:", lsError); } // Ostavljen log greške
                              console.log(`Uvezeno nesačuvano stanje: ${povijest.length} računa, ${ukupno.toFixed(2)} €, Naziv: ${currentSessionName || 'N/A'}`); // Ostavljen ovaj log
                          } else {
-                             // Ako nema nesačuvanog stanja u datoteci ili je prazno, resetiraj trenutnu sesiju
+                             // Ako nema nesačuvanog stanata u datoteci ili je prazno, resetiraj trenutnu sesiju
                              povijest = [];
                              ukupno = 0;
                              currentSessionName = null;
@@ -2403,21 +2403,33 @@ function normalizeDateForSearch(input) {
                     try {
                         await navigator.share(shareData);
                         console.log('Share dijalog zatvoren (vjerojatno uspješno)...'); // Ostavljen ovaj log
-                         checkSharePrompt(); // Provjeri da li prompt treba biti prikazan (ako brojač ostao 0)
-                         updateRunningTextVisibility(); // Update running text visibility based on prompt
-                         sendLogData({ Event: 'share_success' }); // Log uspjeha
+                         sendLogData({ Event: 'share_success' }); // Log success
                     } catch (err) {
                         console.error('Greška dijeljenja:', err); // Ostavljen log greške
                         if (err.name === 'AbortError') {
                             console.log('Korisnik odustao od dijeljenja.'); // Ostavljen ovaj log
-                             sendLogData({ Event: 'share_cancelled' }); // Log otkazivanja
+                             sendLogData({ Event: 'share_cancelled' }); // Log cancellation
                         } else {
                              console.log('Došlo je do druge greške pri dijeljenju.'); // Ostavljen ovaj log
                              showTemporaryMessage(loadedMsg, "Dijeljenje neuspješno.", 1500);
-                              sendLogData({ Event: 'share_failed', Details: err.message }); // Log greške
+                              sendLogData({ Event: 'share_failed', Details: err.message }); // Log error
                         }
                     } finally {
-                         // console.log("Share dijalog završen (finally)."); // KOMENTIRANO: Previše logova
+                         // <-- DODANO/IZMIJENJENO: Resetiranje brojača i UI-ja nakon pokušaja dijeljenja (uspjeh ili neuspjeh)
+                         console.log("Share attempt finished. Checking counter state for reset.");
+                        if (brojac === 0 && brojac2 > 0) { // Resetiraj samo ako je brojač došao do 0 i prag je veći od 0
+                            brojac = brojac2; // Postavi brojač1 na vrijednost brojača2
+                            saveBrojac(); // Spremi novu vrijednost brojača1
+                            console.log("Brojač resetiran na prag:", brojac);
+                            // Logiranje automatskog reseta brojača nakon dijeljenja
+                             sendLogData({ Event: 'share_counter_reset', Details: brojac });
+                        } else {
+                             console.log("Brojač nije resetiran. Stanje: brojac=" + brojac + ", brojac2=" + brojac2);
+                        }
+                         checkSharePrompt(); // Ponovno provjeri state (sakrit će prompt ako je brojač > 0)
+                         updateRunningTextVisibility(); // Update running text visibility
+                         updateDeactivatedIndicator(); // Update indicator visibility
+                         console.log("UI updated after share attempt.");
                     }
                 });
             }

@@ -146,164 +146,6 @@
     }
     /* NO error-mode style needed for this button anymore */
 
-    #invoice-count { font-size: 1.4em; color: black; padding: 0.1em 0.4em; position: fixed; bottom: 170px; right: 50px; z-index: 2; text-align: right; font-weight: bold; }
-    #duplicate-warning { font-weight: bold; color: red; background-color: rgba(255, 255, 255, 0.8); padding: 0.3em 0.8em; border-radius: 5px; border: 1px solid red; text-align: center; animation: pulse 0.5s ease-in-out 3 alternate; position: fixed; top: 12.8em; left: 50%; transform: translateX(-50%); z-index: 5; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-    #loaded-message { font-weight: bold; color: green; display: none; text-align: center; font-size: 2em; position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); animation: zoomFade 1s ease-out; z-index: 10; background-color: rgba(255, 255, 255, 0.85); padding: 0.8em 2em; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,4,8,0.2); }
-    #delete-warning { font-weight: bold; display: none; text-align: center; position: fixed; top: 21.5em; left: 50%; transform: translateX(-50%); padding: 0.3em 0.6em; border-radius: 3px; z-index: 5; box-shadow: 0 1px 2px rgba(0,0,0,0.2); white-space: nowrap; }
-    #delete-warning.delete-mode { color: black; background-color: rgba(255, 255, 0, 0.8); }
-    #delete-warning.info-mode { color: white; background-color: rgba(0, 0, 0, 0.6); border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
-    #history { max-height: 180px; overflow-y: auto; margin: 0; padding: 1em; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); width: 150px; position: fixed; bottom: 10px; left: 10px; z-index: 1; display: block; }
-    #history ul { list-style: none; padding: 0; margin: 0; }
-    #history li { padding: 0.5em 0; border-bottom: 1px solid #eee; white-space: pre; font-weight: bold; overflow: hidden; text-overflow: ellipsis; font-size: 1em; }
-    #history li:last-child { border-bottom: none; }
-    button { padding: 0.5em 1em; font-size: 1em; border: none; border-radius: 5px; color: black; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-    button:active { box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
-    .red-btn { background: #ff0000; color: yellow; }
-    .yellow-btn { background-color: yellow; color: black; }
-    #remove-from-list-btn { position: fixed; bottom: 130px; right: 50px; z-index: 3; }
-    #history-toggle-btn { position: fixed; bottom: 80px; right: 50px; z-index: 3; background-color: white; color: blue; font-weight: bold; }
-    #share-button { position: fixed; bottom: 30px; right: 15px; z-index: 3; background-color: green; color: white; padding: 0.5em 1em; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-weight: bold; animation: pulse-share 1.5s ease-in-out infinite; }
-    #share-button:active { box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); animation: none; }
-    #history-page { display: none; } /* Početno sakriveno */
-
-    /* --- STICKY HEADER STYLES --- */
-    #history-sticky-header { position: sticky; top: 0; background-color: white; z-index: 10; padding: 0.5em 1em; border-bottom: 1px solid #ccc; flex-shrink: 0; }
-    #history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5em; }
-    /* --- END STICKY HEADER STYLES --- */
-
-    #history-header h1 { margin: 0; text-align: center; flex-grow: 1; font-size: 1.3em; }
-    #back-to-scanner-btn { background-color: green; color: white; border: none; font-weight: bold; margin: 0; padding: 0.4em 0.8em; font-size: 0.9em; cursor: pointer; }
-    #back-to-scanner-btn:active { background-color: darkgreen; }
-
-    /* history-content sada treba zauzeti ostatak prostora i skrolati */
-    #history-content { flex-grow: 1; overflow-y: auto; padding: 1em; position: relative; }
-
-     /* Stilovi za liste unutar history-content ostaju isti */
-     #scan-group-list, #all-days-list-rendered, #search-results ul, #search-results-all-days ul { list-style: none; padding: 0; margin: 0; }
-     #scan-group-list li, #all-days-list-rendered li, #search-results li, #search-results-all-days li { background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background-color 0.2s ease; }
-     #scan-group-list li:hover, #all-days-list-rendered li:hover, #search-results li:hover, #search-results-all-days li:hover { background-color: #efefef; }
-     .scan-group-last-qr-time { font-size: 0.8em; color: #777; margin-left: 15px; flex-shrink: 0; }
-     .session-name-history { font-size: 1em; color: #00008B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
-     .scan-time-history { font-size: 1em; color: #333; white-space: nowrap; margin-left: 5px; }
-     #clear-history-btn.confirm-mode, #delete-session-btn.confirm-mode, #clear-day-btn.confirm-mode { background-color: yellow; color: black; }
-     #detail-scan-list { list-style: none; padding: 0; margin: 0; }
-     #detail-scan-list li {display: flex; justify-content: space-between; align-items: center; padding: 0.6em 0.2em; border-bottom: 1px solid #eee; font-size: 1.05em;}
-     #detail-scan-list li:last-child { border-bottom: none; }
-
-     /* Pretraga SVI DANI - sada unutar sticky headera */
-     #all-days-search-container { background-color: white; padding: 0.5em 0; margin-bottom: 0.2em; }
-     #all-days-search-container input { flex-grow: 1; padding: 0.5em; min-width: 50px; font-size: 0.9em; }
-     #all-days-search-container button { padding: 0.5em 0.6em; font-size: 0.9em; flex-shrink: 0; }
-
-     /* Pretraga JEDAN DAN - sada unutar sticky headera */
-      #search-container { display: none; padding: 1em 0; margin-bottom: 1em; }
-      #search-container > div:first-child { display: flex; gap: 10px; margin-bottom: 0.8em; }
-      #search-summary-info-day { display: none; justify-content: space-between; align-items: center; padding: 0.6em 0; font-size: 1.1em; margin-top: 0.8em; border-top: 1px solid #eee; }
-      #search-results { /* Ovaj div OSTAJE u #history-content */ }
-
-     /* Stilovi za prikaz dana/sesija u listi ostaju isti */
-     #all-days-list-rendered li { background-color: #f0f0f0; border: 1px solid #ccc; padding: 12px 15px; margin-bottom: 8px; }
-     #all-days-list-rendered li:hover { background-color: #e0e0e0; }
-
-     /* Sažetak i info elementi - unutar sticky headera */
-     #all-days-summary-info, #history-date-info, #history-summary-info, #detail-header-info, #detail-summary-info, #search-summary-info-day, #all-days-search-container { padding: 0.6em 0; margin-bottom: 0.5em; border-top: 1px solid #eee; }
-    /* Uklanjanje gornje linije za prvi element u dynamic headeru */
-     #history-dynamic-header-content > *:first-child { border-top: none; padding-top: 0; }
-
-     /* Specifični stilovi koji overrideaju gornje */
-     #all-days-summary-info, #search-summary-info-day { display: none; justify-content: space-between; align-items: center; font-size: 1.1em; }
-     #history-date-info, #history-summary-info, #detail-summary-info { display: flex; justify-content: space-between; align-items: center; font-size: 1.1em; }
-     #detail-header-info { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.5em; border-bottom: 1px solid #ccc; border-top: none; }
-     #detail-summary-info { border-top: none; }
-     #all-days-search-container { padding-bottom: 0.2em; border-bottom: 1px solid #eee; }
-     #search-container { display: none; border-bottom: 1px solid #eee; }
-
-    /* --- NOVI STILOVI --- */
-    #running-text-container { position: absolute; top: 4.8em; left: 0; width: 100%; overflow: hidden; white-space: nowrap; z-index: 2; pointer-events: none; display: none; }
-    #running-text-container span { display: inline-block; padding-left: 100%; font-size: 1.4em; font-weight: bold; color: yellow; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8); animation: marquee 10s linear infinite; white-space: pre; /* <<< DODANA OVA LINIJA */}
-    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
-
-    #share-prompt-overlay {
-        position: absolute;
-        top: 7em;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 60%;
-        height: auto;
-        background-color: rgba(0, 0, 0, 0.75);
-        color: lightgreen;
-        font-size: 1.3em;
-        font-weight: bold;
-        text-align: center;
-        padding: 1.5em 1em;
-        border-radius: 10px;
-        z-index: 4;
-        display: none;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        line-height: 1.4;
-        align-items: center;
-        justify-content: center;
-    }
-    /* IZMJENA: Uklonjena pozadina kvačice */
-    #counter-deactivated-indicator { position: fixed; top: 10px; left: 10px; font-size: 1em; color: limegreen; background-color: transparent; z-index: 5; display: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
-
-    /* NOVI Stil za gumb za promjenu kamere */
-    #switch-camera-btn {
-        position: fixed; /* Zaljepljen za ekran */
-        top: 10px;       /* Udaljenost od vrha */
-        right: 10px;     /* Udaljenost od desnog ruba */
-        z-index: 5;      /* Iznad #reader, ali ispod nekih poruka možda */
-        padding: 6px 8px; /* Malo veći padding */
-        background-color: rgba(0, 0, 0, 0.5); /* Poluprozirna pozadina */
-        color: white;
-        border: none;
-        border-radius: 50%; /* Okrugli gumb */
-        font-size: 1.4em;  /* Veličina ikonice */
-        line-height: 1;    /* Da ikonica bude centrirana */
-        cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        display: none; /* Početno skriven, JS ga prikazuje */
-    }
-    #switch-camera-btn:active {
-        background-color: rgba(0, 0, 0, 0.7);
-    }
-
-    /* NOVI Stil za overlay s popisom kamera */
-    #camera-selection-overlay {
-        position: fixed; /* Zaljepljen za ekran */
-        top: 55px;       /* Ispod gumba (prilagodi ako treba) */
-        right: 10px;
-        background-color: white;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        z-index: 6;      /* Iznad gumba */
-        padding: 5px 0; /* Gore/dolje padding */
-        display: none;   /* Početno skriven */
-        max-height: 150px; /* Ograničenje visine ako ima puno kamera */
-        overflow-y: auto; /* Scroll ako treba */
-        min-width: 150px; /* Minimalna širina */
-    }
-    #camera-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-    #camera-list li {
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 0.9em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    #camera-list li:hover {
-        background-color: #f0f0f0;
-    }
-    #camera-list li.selected-camera { /* Opcionalno: za označavanje trenutne */
-        font-weight: bold;
-        background-color: #e0e0e0;
-    }
 
     /* --- MANUAL ENTRY MODAL CSS --- */
     #manual-entry-modal-overlay {
@@ -387,6 +229,11 @@
         display: none;
     }
     /* --- END MANUAL ENTRY MODAL CSS --- */
+
+    /* Ensure the import file input is hidden by default */
+    #import-file-input {
+        display: none;
+    }
 
 
     /* Uklanjamo JS animaciju za duplicate-warning i oslanjamo se samo na CSS ako postoji */
@@ -476,6 +323,11 @@
   </div>
   <!-- End Manual Entry Modal -->
 
+  <!-- Element za odabir datoteke kod uvoza (skriven) -->
+  <input type="file" id="import-file-input" accept=".json">
+  <!-- Kraj elementa za uvoz -->
+
+
   <!-- AŽURIRANI AUDIO TAGOVI S VAŠIM DATOTEKAMA S GITHUBa -->
   <audio id="scan-sound" src="https://raw.githubusercontent.com/Soboslikar/QR-RACUNATOR/main/Učitano.mp3" preload="auto"></audio>
   <audio id="click-sound" src="https://raw.githubusercontent.com/Soboslikar/QR-RACUNATOR/main/click8.mp3" preload="auto"></audio>
@@ -527,12 +379,14 @@
     let currentUserID = null;
     let firstUseTimestamp = null;
 
-    // DOM Elementi (Uključujući nove za Ručni unos)
+    // DOM Elementi (Uključujući nove za Ručni unos i Import file input)
     let totalDiv, totalContainer, ocistiButton, invoiceCountDiv, historyList, removeButton, duplicateWarning, loadedMsg, instructionDiv, deleteWarningDiv, shareButton, readerDiv, historyToggleButton, historyDiv, historyPageDiv, backToScannerButton, historyContentDiv, sessionNameContainer, addNameBtn, sessionNameInput, sessionNameDisplay, sessionNameText, historyStickyHeaderDiv, historyDynamicHeaderContentDiv, runningTextContainer, runningTextSpan, sharePromptOverlay, counterDeactivatedIndicator;
     // NOVI DOM Elementi za kameru
     let switchCameraButton, cameraSelectionOverlay, cameraListUl;
     // NOVI DOM Elementi za Ručni unos
     let manualEntryBtn, manualEntryModalOverlay, manualAmountInput, manualTimeInput, manualAddBtn, manualCancelBtn, manualEntryErrorMsg;
+    // NOVI DOM Element za Import file input
+    let importFileInput;
 
 
     // --- VARIJABLE ZA KONTROLU ZVUKOVA I PORUKA ---
@@ -1580,10 +1434,10 @@ function normalizeDateForSearch(input) {
         if (historyDynamicHeaderContentDiv) historyDynamicHeaderContentDiv.innerHTML = ''; // Očisti header povijesti
          if (document.getElementById('search-container')) document.getElementById('search-container').style.display = 'none'; // Sakrij search container
          if (document.getElementById('all-days-search-container')) document.getElementById('all-days-search-container').style.display = 'none'; // Sakrij all days search
-        // Sakrij export/import gumbe ako postoje u history view
+        // Sakrij export/import gumbe ako postoje u history view (Više ih ne generira renderAllDaysView, ali ostavljamo logiku ako ih tamo ipak bude)
         if(document.getElementById('export-history-btn')) document.getElementById('export-history-btn').style.display = 'none';
         if(document.getElementById('import-history-btn')) document.getElementById('import-history-btn').style.display = 'none';
-        if(document.getElementById('import-file-input')) document.getElementById('import-file-input').style.display = 'none';
+        // import-file-input se sada skriva globalnim CSS-om u history-view
 
 
         document.body.classList.remove('history-view');
@@ -1657,7 +1511,7 @@ function normalizeDateForSearch(input) {
 
     // *** FUNKCIJE ZA RENDERIRANJE HISTORY VIEWA ***
     function clearDynamicHeaderContent() { if (historyDynamicHeaderContentDiv) { historyDynamicHeaderContentDiv.innerHTML = ''; } }
-    function renderHistoryView(dateToShow = currentlyViewedDate) { console.log("renderHistoryView: Pokrenuto za datum:", dateToShow); previousHistoryViewState = 'day-view'; currentlyViewedDate = new Date(dateToShow); currentlyViewedDate.setHours(0,0,0,0); const punaPovijest = loadFullHistoryFromLocalStorage(); console.log("renderHistoryView: Učitana povijest iz localStorage:", punaPovijest); if (!historyContentDiv || !historyPageDiv || !historyDynamicHeaderContentDiv) { console.error("renderHistoryView: Kritični DOM elementi nedostaju!"); return; } clearDynamicHeaderContent(); const opcijeDana = { weekday: 'long' }; const opcijeDatuma = { day: '2-digit', month: '2-digit', year: 'numeric' }; let imeDana = currentlyViewedDate.toLocaleDateString('hr-HR', opcijeDana); imeDana = imeDana.charAt(0).toUpperCase() + imeDana.slice(1); const formatiraniDatum = currentlyViewedDate.toLocaleDateString('hr-HR', opcijeDatuma); const startOfDay = new Date(currentlyViewedDate); const endOfDay = new Date(currentlyViewedDate); endOfDay.setHours(23, 59, 59, 999); const sesijeZaPrikazaniDan = punaPovijest.filter(grupa => { const grupaDate = new Date(grupa.timestamp); return grupaDate >= startOfDay && grupaDate <= endOfDay; }); sesijeZaPrikazaniDan.sort((a, b) => a.timestamp - b.timestamp); const brojRacunaOvajDan = sesijeZaPrikazaniDan.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const ukupanIznosOvajDan = sesijeZaPrikazaniDan.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); const dateInfoDiv = document.createElement('div'); dateInfoDiv.id = 'history-date-info'; const currentViewDateStr = getISODateString(currentlyViewedDate); const hasOtherDays = punaPovijest.some(grupa => { const grupaDateStr = getISODateString(new Date(grupa.timestamp)); return grupaDateStr && grupaDateStr !== currentViewDateStr; }); dateInfoDiv.innerHTML = `<span style="font-weight: bold;">${imeDana}, ${formatiraniDatum}</span> <button id="history-view-toggle-btn" style="background-color: yellow; color: black; padding: 0.4em 0.8em; font-size: 0.9em; font-weight: bold;" ${!hasOtherDays ? 'disabled' : ''}>OSTALI DANI ></button>`; historyDynamicHeaderContentDiv.appendChild(dateInfoDiv); const historyViewToggleButton = dateInfoDiv.querySelector('#history-view-toggle-btn'); if (historyViewToggleButton) { const newHistoryViewToggleButton = historyViewToggleButton.cloneNode(true); historyViewToggleButton.parentNode.replaceChild(newHistoryViewToggleButton, historyViewToggleButton); if (!newHistoryViewToggleButton.disabled) { newHistoryViewToggleButton.addEventListener('click', () => { playSound('click-sound'); renderAllDaysView(); }); newHistoryViewToggleButton.style.cursor = 'pointer'; newHistoryViewToggleButton.style.opacity = '1'; } else { newHistoryViewToggleButton.style.cssText += ';cursor: not-allowed; opacity: 0.7;'; } } const summaryInfoDiv = document.createElement('div'); summaryInfoDiv.id = 'history-summary-info'; summaryInfoDiv.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${brojRacunaOvajDan}</span></span> <span style="font-weight: bold;">UKUPNO: ${ukupanIznosOvajDan.toFixed(2)} €</span>`; historyDynamicHeaderContentDiv.appendChild(summaryInfoDiv); const uputaHtml = `<p id="history-select-group-text" style="text-align: center; color: black; font-weight: bold; font-style: normal; margin-bottom: 1em; margin-top: 0.5em; font-size: 0.9em;">IZABERI SKEN ILI <button id="start-search-btn" style="background:none; border:none; padding:0; color:blue; text-decoration:underline; cursor:pointer; font-size:inherit; font-weight:bold;">(TRAŽI)</button></p>`; let sesijeHtml = '<ul id="scan-group-list" style="list-style: none; padding: 0; margin: 0;">'; if (sesijeZaPrikazaniDan.length === 0) { sesijeHtml += '<li style="text-align:center; color: grey; border: none; cursor: default; padding: 1em 0;"><i>Nema spremljenih skenova za ovaj dan.</i></li>'; } else { sesijeZaPrikazaniDan.forEach((sesija, index) => { sesijeHtml += generirajHtmlZaSpremljenuGrupu(sesija, index + 1); }); } sesijeHtml += '</ul>'; historyContentDiv.innerHTML = uputaHtml + sesijeHtml; if (sesijeZaPrikazaniDan.length > 0) { const clearDayButton = document.createElement('button'); clearDayButton.id = 'clear-day-btn'; clearDayButton.className = 'red-btn'; clearDayButton.style.margin = '2em auto 1em auto'; clearDayButton.style.display = 'block'; clearDayButton.innerText = 'IZBRIŠI OVAJ DAN'; historyContentDiv.appendChild(clearDayButton); clearDayButton.dataset.confirming = 'false'; const newClearDayBtn = clearDayButton.cloneNode(true); clearDayButton.parentNode.replaceChild(newClearDayBtn, clearDayBtn); newClearDayBtn.addEventListener('click', () => {
+    function renderHistoryView(dateToShow = currentlyViewedDate) { console.log("renderHistoryView: Pokrenuto za datum:", dateToShow); previousHistoryViewState = 'day-view'; currentlyViewedDate = new Date(dateToShow); currentlyViewedDate.setHours(0,0,0,0); const punaPovijest = loadFullHistoryFromLocalStorage(); console.log("renderHistoryView: Učitana povijest iz localStorage:", punaPovijest); if (!historyContentDiv || !historyPageDiv || !historyDynamicHeaderContentDiv) { console.error("renderHistoryView: Kritični DOM elementi nedostaju!"); return; } clearDynamicHeaderContent(); const opcijeDana = { weekday: 'long' }; const opcijeDatuma = { day: '2-digit', month: '2-digit', year: 'numeric' }; let imeDana = currentlyViewedDate.toLocaleDateString('hr-HR', opcijeDana); imeDana = imeDana.charAt(0).toUpperCase() + imeDana.slice(1); const formatiraniDatum = currentlyViewedDate.toLocaleDateString('hr-HR', opcijeDatuma); const startOfDay = new Date(currentlyViewedDate); const endOfDay = new Date(currentlyViewedDate); endOfDay.setHours(23, 59, 59, 999); const sesijeZaPrikazaniDan = punaPovijest.filter(grupa => { const grupaDate = new Date(grupa.timestamp); return grupaDate >= startOfDay && grupaDate <= endOfDay; }); sesijeZaPrikazaniDan.sort((a, b) => a.timestamp - b.timestamp); const brojRacunaOvajDan = sesijeZaPrikazaniDan.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const ukupanIznosOvajDan = sesijeZaPrikazaniDan.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); const dateInfoDiv = document.createElement('div'); dateInfoDiv.id = 'history-date-info'; const currentViewDateStr = getISODateString(currentlyViewedDate); const hasOtherDays = punaPovijest.some(grupa => { const grupaDateStr = getISODateString(new Date(grupa.timestamp)); return grupaDateStr && grupaDateStr !== currentViewDateStr; }); dateInfoDiv.innerHTML = `<span style="font-weight: bold;">${imeDana}, ${formatiraniDatum}</span> <button id="history-view-toggle-btn" style="background-color: yellow; color: black; padding: 0.4em 0.8em; font-size: 0.9em; font-weight: bold;" ${!hasOtherDays ? 'disabled' : ''}>OSTALI DANI ></button>`; historyDynamicHeaderContentDiv.appendChild(dateInfoDiv); const historyViewToggleButton = dateInfoDiv.querySelector('#history-view-toggle-btn'); if (historyViewToggleButton) { const newHistoryViewToggleButton = historyViewToggleButton.cloneNode(true); historyViewToggleButton.parentNode.replaceChild(newHistoryViewToggleButton, historyViewToggleButton); if (!newHistoryViewToggleButton.disabled) { newHistoryViewToggleButton.addEventListener('click', () => { playSound('click-sound'); renderAllDaysView(); }); newHistoryViewToggleButton.style.cursor = 'pointer'; newHistoryViewToggleButton.style.opacity = '1'; } else { newHistoryViewToggleButton.style.cssText += ';cursor: not-allowed; opacity: 0.7;'; } } const summaryInfoDiv = document.createElement('div'); summaryInfoDiv.id = 'history-summary-info'; summaryInfoDiv.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${brojRacunaOvajDan}</span></span> <span style="font-weight: bold;">UKUPNO: ${ukupanIznosOvajDan.toFixed(2)} €</span>`; historyDynamicHeaderContentDiv.appendChild(summaryInfoDiv); const uputaHtml = `<p id="history-select-group-text" style="text-align: center; color: black; font-weight: bold; font-style: normal; margin-bottom: 1em; margin-top: 0.5em; font-size: 0.9em;">IZABERI SKEN ILI <button id="start-search-btn" style="background:none; border:none; padding:0; color:blue; text-decoration:underline; cursor:pointer; font-size:inherit; font-weight:bold;">(TRAŽI)</button></p>`; let sesijeHtml = '<ul id="scan-group-list" style="list-style: none; padding: 0; margin: 0;">'; if (sesijeZaPrikazaniDan.length === 0) { sesijeHtml += '<li style="text-align:center; color: grey; border: none; cursor: default; padding: 1em 0;"><i>Nema spremljenih skenova za ovaj dan.</i></li>'; } else { sesijeZaPrikazaniDan.forEach((sesija, index) => { sesijeHtml += generirajHtmlZaSpremljenuGrupu(sesija, index + 1); }); } sesijeHtml += '</ul>'; historyContentDiv.innerHTML = uputaHtml + sesijeHtml; if (sesijeZaPrikazaniDan.length > 0) { const clearDayButton = document.createElement('button'); clearDayButton.id = 'clear-day-btn'; clearDayButton.className = 'red-btn'; clearDayButton.style.margin = '2em auto 1em auto'; clearDayButton.style.display = 'block'; clearDayButton.innerText = 'IZBRIŠI OVAJ DAN'; historyContentDiv.appendChild(clearDayButton); clearDayButton.dataset.confirming = 'false'; const newClearDayBtn = clearDayButton.cloneNode(true); clearDayButton.parentNode.replaceChild(newClearDayBtn, clearDayButton); newClearDayBtn.addEventListener('click', () => {
             if (newClearDayBtn.disabled) return;
             if (newClearDayBtn.dataset.confirming !== 'true') { // Check if NOT already confirming
                 playSound('click-sound'); // Zvuk na prvi klik za potvrdu
@@ -1742,18 +1596,17 @@ function normalizeDateForSearch(input) {
          }
      } else { console.warn("Sesija za brisanje nije pronađena:", timestampToDelete); alert("Greška: Sken nije pronađen."); const deleteBtn = document.getElementById('delete-session-btn'); if(deleteBtn && deleteBtn.dataset.confirming === 'true') { deleteBtn.innerText = "IZBRIŠI OVAJ SKEN"; deleteBtn.classList.remove('confirm-mode'); deleteBtn.dataset.confirming = 'false'; } } }
     function renderAllDaysView() { previousHistoryViewState = 'all-days-view'; const punaPovijest = loadFullHistoryFromLocalStorage(); if (!historyContentDiv || !historyPageDiv || !historyDynamicHeaderContentDiv) return; clearDynamicHeaderContent(); const searchBarHtml = `<div id="all-days-search-container"><div style="display: flex; gap: 5px;"><input type="text" id="all-days-search-input" placeholder="UPIŠI ZA PRETRAGU..." style="flex-grow: 1; padding: 0.5em; font-size: 0.9em;"><button id="execute-all-days-search-btn" style="padding: 0.5em 0.6em; font-size: 0.9em;">Traži</button><button id="close-all-days-search-btn" style="padding: 0.5em 0.6em; background-color: #ccc; font-size: 0.9em;">Svi Dani</button></div></div><div id="all-days-summary-info" style="display: none;"></div>`; historyDynamicHeaderContentDiv.innerHTML = searchBarHtml; const resultsPlaceholderHtml = `<div id="search-results-all-days"><p style="text-align:center; color: grey; padding: 1em 0;"><i>Unesite pojam za pretragu ili kliknite "Svi Dani" za prikaz liste.</i></p></div>`; historyContentDiv.innerHTML = resultsPlaceholderHtml; const searchInput = document.getElementById('all-days-search-input'); const executeBtn = document.getElementById('execute-all-days-search-btn'); const closeBtn = document.getElementById('close-all-days-search-btn'); const searchResultsContainer = document.getElementById('search-results-all-days'); const allDaysSummaryContainer = document.getElementById('all-days-summary-info'); const sessionsByDate = punaPovijest.reduce((acc, session) => { const dateStr = getISODateString(new Date(session.timestamp)); if (!dateStr) return acc; if (!acc[dateStr]) { acc[dateStr] = { date: new Date(session.timestamp), sessions: [], totalAmount: 0, totalCount: 0 }; acc[dateStr].date.setHours(0, 0, 0, 0); } acc[dateStr].sessions.push(session); acc[dateStr].totalAmount += session.racuni.reduce((sum, item) => sum + item.amount, 0); acc[dateStr].totalCount += session.racuni.length; return acc; }, {}); const sortedDays = Object.values(sessionsByDate).sort((a, b) => b.date - a.date); if(searchInput && executeBtn && closeBtn && searchResultsContainer && allDaysSummaryContainer) { const newSearchInput = searchInput.cloneNode(true); searchInput.parentNode.replaceChild(newSearchInput, searchInput); newSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') executeAllDaysSearch(); }); const newExecuteBtn = executeBtn.cloneNode(true); executeBtn.parentNode.replaceChild(newExecuteBtn, executeBtn); newExecuteBtn.addEventListener('click', () => { executeAllDaysSearch(); }); const newCloseBtn = closeBtn.cloneNode(true); closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn); newCloseBtn.addEventListener('click', () => { playSound('click-sound'); newSearchInput.value = ''; renderAllDaysList(sortedDays, searchResultsContainer); const totalCountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.length, 0); const totalAmountAll = punaPovijest.reduce((sum, grupa) => sum + grupa.racuni.reduce((gSum, item) => gSum + item.amount, 0), 0); allDaysSummaryContainer.innerHTML = `<span>RAČUNA: <span style="font-weight: bold;">${totalCountAll}</span></span><span style="font-weight: bold;">UKUPNO: ${totalAmountAll.toFixed(2)} €</span>`; allDaysSummaryContainer.style.display = punaPovijest.length > 0 ? 'flex' : 'none'; }); } else { console.error("Nisu pronađeni svi elementi za pretragu u All Days View."); } if (punaPovijest.length > 0) { const backButtonHtml = `<button id="back-to-current-day-btn" style="background-color: #6c757d; color: white; margin-right: 10px; padding: 0.5em 1em; font-size: 1em;">< NATRAG</button>`; const clearAllButtonHtml = `<button id="clear-history-btn" class="red-btn" style="padding: 0.5em 1em; font-size: 1em;">IZBRIŠI SVU POVIJEST</button>`;
-             // Dodavanje Export/Import gumba
-             const exportImportButtonsHtml = `<div style="text-align: center; margin-top: 1em; margin-bottom: 1em;"><button id="export-history-btn" style="background-color: #007bff; color: white; margin-right: 10px; padding: 0.5em 1em; font-size: 1em;">Izvezi povijest</button><button id="import-history-btn" style="background-color: #28a745; color: white; padding: 0.5em 1em; font-size: 1em;">Uvezi povijest</button><input type="file" id="import-file-input" accept=".json" style="display: none;"></div>`;
+             // Dodavanje Export/Import gumba (Sada samo gumbe jer je input globalno)
+             const exportImportButtonsHtml = `<div style="text-align: center; margin-top: 1em; margin-bottom: 1em;"><button id="export-history-btn" style="background-color: #007bff; color: white; margin-right: 10px; padding: 0.5em 1em; font-size: 1em;">Izvezi povijest</button><button id="import-history-btn" style="background-color: #28a745; color: white; padding: 0.5em 1em; font-size: 1em;">Uvezi povijest</button></div>`; // Removed input from here
 
              const buttonsHtml = `<div style="text-align: center; margin-top: 1.5em; margin-bottom: 1em;">${backButtonHtml}${clearAllButtonHtml}</div> ${exportImportButtonsHtml}`; // Combine buttons
 
              if (!document.getElementById('back-to-current-day-btn') || !document.getElementById('clear-history-btn') || !document.getElementById('export-history-btn')) { // Check if buttons are not already added
                  historyContentDiv.insertAdjacentHTML('beforeend', buttonsHtml);
 
-                 // Dohvati referene na nove gumbe i input NAKON što su dodani
+                 // Dohvati referene na nove gumbe NAKON što su dodani
                  const exportBtn = document.getElementById('export-history-btn');
                  const importBtn = document.getElementById('import-history-btn');
-                 // const importFileInput = document.getElementById('import-file-input'); // Reference je već dohvatio DOMContentLoaded
 
                  if (exportBtn) {
                      const newExportBtn = exportBtn.cloneNode(true);
@@ -1852,7 +1705,7 @@ function normalizeDateForSearch(input) {
     function exportHistory() {
         playSound('click-sound');
         const punaPovijest = loadFullHistoryFromLocalStorage();
-        if (punaPovijest.length === 0) {
+        if (punaPovijest.length === 0 && povijest.length === 0 && !currentSessionName) {
             alert("Nema povijesti za izvoz.");
              sendLogData({ Event: 'history_exported', Details: 'no_data' }); // Logiranje izvoza (nema podataka)
             return;
@@ -1860,12 +1713,10 @@ function normalizeDateForSearch(input) {
 
         try {
             // Dodaj trenutno nesačuvano stanje u izvoz, ako postoji
-            const unsavedCount = localStorage.getItem(UNSAVED_COUNT_KEY);
-            const unsavedAmount = localStorage.getItem(UNSAVED_AMOUNT_KEY);
-            let unsavedData = null;
-            if (unsavedCount !== null && unsavedAmount !== null && parseInt(unsavedCount, 10) > 0) {
-                 unsavedData = { count: parseInt(unsavedCount, 10), amount: parseFloat(unsavedAmount), currentSession: povijest, currentName: currentSessionName || null };
-            }
+            const unsavedData = (povijest.length > 0 || currentSessionName) ?
+                { count: povijest.length, amount: ukupno, currentSession: povijest, currentName: currentSessionName || null }
+                : null;
+
 
             const dataToExport = {
                  savedHistory: punaPovijest,
@@ -1976,7 +1827,7 @@ function normalizeDateForSearch(input) {
                      }
 
 
-                    const confirmMessage = `Pronađeno ${historyToImport.length} spremljenih sesija ${unsavedToImport ? ` i nesačuvano stanje (${unsavedToImport.count} računa)` : ''} u datoteci.\n\nŽelite li PREPISATI vašu trenutnu povijest i nesačuvano stanje ovim podacima?\n(Trenutna povijest i nesačuvano stanje će biti trajno izbrisani!)`;
+                    const confirmMessage = `Pronađeno ${historyToImport.length} spremljenih sesija ${unsavedToImport && unsavedToImport.count > 0 ? ` i nesačuvano stanje (${unsavedToImport.count} računa)` : ''} u datoteci.\n\nŽelite li PREPISATI vašu trenutnu povijest i nesačuvano stanje ovim podacima?\n(Trenutna povijest i nesačuvano stanje će biti trajno izbrisani!)`;
                     if (confirm(confirmMessage)) {
                         // Brišemo sve lokalne podatke da bi uvoz bio čist
                         localStorage.removeItem(HISTORY_STORAGE_KEY);
@@ -1993,7 +1844,7 @@ function normalizeDateForSearch(input) {
                         saveFullHistoryToLocalStorage(historyToImport); // Spremi uvezenu povijest
 
                         // Učitaj uvezeno nesačuvano stanje
-                         if (unsavedToImport) {
+                         if (unsavedToImport && unsavedToImport.count > 0) { // Učitaj samo ako postoji i ima računa
                              povijest = unsavedToImport.currentSession;
                              ukupno = unsavedToImport.amount;
                              currentSessionName = unsavedToImport.currentName;
@@ -2092,7 +1943,10 @@ function normalizeDateForSearch(input) {
              const manualEntryModalContent = document.getElementById('manual-entry-modal-content');
              const isClickInsideManualModal = manualEntryModalContent && manualEntryModalContent.contains(event.target);
              const isClickOnManualEntryBtn = manualEntryBtn && manualEntryBtn.contains(event.target); // Allow clicking the toggle button
-             if (!isClickInsideManualModal && !isClickOnManualEntryBtn) {
+             // Također dozvoli klik na inpute i gumbe unutar modala
+             const isClickInsideModalContent = manualEntryModalContent && manualEntryModalContent.contains(event.target);
+
+             if (!isClickInsideModalContent && !isClickOnManualEntryBtn) {
                  cancelManualEntry(); // Koristi cancel za zvuk i log
              }
          }
@@ -2106,6 +1960,9 @@ function normalizeDateForSearch(input) {
         const isClickOnEditIcon = event.target.classList.contains('edit-icon');
         const isClickOnDeleteWarning = deleteWarningDiv && deleteWarningDiv.style.display !== 'none' && deleteWarningDiv.contains(event.target);
         const isClickOnHistoryDeleteButton = event.target.closest('#clear-day-btn, #delete-session-btn, #clear-history-btn'); // Selektiraj sve gumbe za brisanje u povijesti
+        const isClickOnHistoryButton = historyToggleButton && historyToggleButton.contains(event.target); // History toggle button
+        const isClickOnShareButton = shareButton && shareButton.contains(event.target); // Share button
+
 
         // Reset Remove button (skener view) if in confirm mode and clicked outside its area
         if ((removeConfirm || removeNameConfirm) && !isClickOnRemoveButton && !isClickOnDeleteWarning) {
@@ -2124,7 +1981,7 @@ function normalizeDateForSearch(input) {
         }
 
         // Reset History Delete Buttons if in confirm mode and clicked outside *any* of them
-        if (!isClickOnHistoryDeleteButton) {
+        if (!isClickOnHistoryDeleteButton && !isClickOnHistoryButton && !isClickOnShareButton) { // Also don't reset if clicking history or share buttons
              const clearDayBtn = document.getElementById('clear-day-btn');
              if (clearDayBtn && clearDayBtn.dataset.confirming === 'true') {
                   clearDayBtn.innerText = "IZBRIŠI OVAJ DAN";
@@ -2139,7 +1996,7 @@ function normalizeDateForSearch(input) {
                    deleteSessionBtn.classList.remove('confirm-mode');
                    deleteSessionBtn.dataset.confirming = 'false';
                    console.log("Resetirao deleteSessionBtn iz global click (outside)");
-                    // Need session ID here, difficult from just the button. Maybe log just cancellation.
+                   // Log cancellation, session ID is hard to get here reliably
               }
               const clearAllBtn = document.getElementById('clear-history-btn');
               if (clearAllBtn && clearAllBtn.dataset.confirming === 'true') {
@@ -2196,8 +2053,8 @@ function normalizeDateForSearch(input) {
         manualAddBtn = document.getElementById('manual-add-btn');
         manualCancelBtn = document.getElementById('manual-cancel-btn');
         manualEntryErrorMsg = document.getElementById('manual-entry-error');
-        // Import file input is needed globally for importHistory() function, fetch it here
-        const importFileInput = document.getElementById('import-file-input');
+        // Import file input je potreban globally za importHistory() funkciju
+        importFileInput = document.getElementById('import-file-input');
 
 
         // Provjera osnovnih elemenata (uključujući nove)
@@ -2378,6 +2235,7 @@ function normalizeDateForSearch(input) {
         // --- Listener za input datoteku kod uvoza (povezan unutar importHistory) ---
         // Referenca na importFileInput je već dohvatio na početku DOMContentLoaded
         // Event listener je unutar importHistory funkcije
+
 
         // --- REDOSLIJED INICIJALIZACIJE ---
         // 1. Učitaj lokalno stanje brojača

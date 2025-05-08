@@ -45,7 +45,7 @@
     /* MODIFIED session-name-container for flexbox layout */
     #session-name-container {
         position: fixed;
-        top: 27em; /* Keep vertical position */
+        top: 27.5em; /* Povećan 'top' za 0.5em */
         left: 50%;
         transform: translateX(-50%);
         z-index: 5; /* Povećan z-index */
@@ -146,6 +146,165 @@
     }
     /* NO error-mode style needed for this button anymore */
 
+
+    #invoice-count { font-size: 1.4em; color: black; padding: 0.1em 0.4em; position: fixed; bottom: 170px; right: 50px; z-index: 2; text-align: right; font-weight: bold; }
+    #duplicate-warning { font-weight: bold; color: red; background-color: rgba(255, 255, 255, 0.8); padding: 0.3em 0.8em; border-radius: 5px; border: 1px solid red; text-align: center; animation: pulse 0.5s ease-in-out 3 alternate; position: fixed; top: 12.8em; left: 50%; transform: translateX(-50%); z-index: 5; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    #loaded-message { font-weight: bold; color: green; display: none; text-align: center; font-size: 2em; position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); animation: zoomFade 1s ease-out; z-index: 10; background-color: rgba(255, 255, 255, 0.85); padding: 0.8em 2em; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,4,8,0.2); }
+    #delete-warning { font-weight: bold; display: none; text-align: center; position: fixed; top: 21.5em; left: 50%; transform: translateX(-50%); padding: 0.3em 0.6em; border-radius: 3px; z-index: 5; box-shadow: 0 1px 2px rgba(0,0,0,0.2); white-space: nowrap; }
+    #delete-warning.delete-mode { color: black; background-color: rgba(255, 255, 0, 0.8); }
+    #delete-warning.info-mode { color: white; background-color: rgba(0, 0, 0, 0.6); border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+    #history { max-height: 180px; overflow-y: auto; margin: 0; padding: 1em; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); width: 150px; position: fixed; bottom: 10px; left: 10px; z-index: 1; display: block; }
+    #history ul { list-style: none; padding: 0; margin: 0; }
+    #history li { padding: 0.5em 0; border-bottom: 1px solid #eee; white-space: pre; font-weight: bold; overflow: hidden; text-overflow: ellipsis; font-size: 1em; }
+    #history li:last-child { border-bottom: none; }
+    button { padding: 0.5em 1em; font-size: 1em; border: none; border-radius: 5px; color: black; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    button:active { box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
+    .red-btn { background: #ff0000; color: yellow; }
+    .yellow-btn { background-color: yellow; color: black; }
+    #remove-from-list-btn { position: fixed; bottom: 130px; right: 50px; z-index: 3; }
+    #history-toggle-btn { position: fixed; bottom: 80px; right: 50px; z-index: 3; background-color: white; color: blue; font-weight: bold; }
+    #share-button { position: fixed; bottom: 30px; right: 15px; z-index: 3; background-color: green; color: white; padding: 0.5em 1em; font-size: 1em; border: none; border-radius: 5px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-weight: bold; animation: pulse-share 1.5s ease-in-out infinite; }
+    #share-button:active { box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); animation: none; }
+    #history-page { display: none; } /* Početno sakriveno */
+
+    /* --- STICKY HEADER STYLES --- */
+    #history-sticky-header { position: sticky; top: 0; background-color: white; z-index: 10; padding: 0.5em 1em; border-bottom: 1px solid #ccc; flex-shrink: 0; }
+    #history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5em; }
+    /* --- END STICKY HEADER STYLES --- */
+
+    #history-header h1 { margin: 0; text-align: center; flex-grow: 1; font-size: 1.3em; }
+    #back-to-scanner-btn { background-color: green; color: white; border: none; font-weight: bold; margin: 0; padding: 0.4em 0.8em; font-size: 0.9em; cursor: pointer; }
+    #back-to-scanner-btn:active { background-color: darkgreen; }
+
+    /* history-content sada treba zauzeti ostatak prostora i skrolati */
+    #history-content { flex-grow: 1; overflow-y: auto; padding: 1em; position: relative; }
+
+     /* Stilovi za liste unutar history-content ostaju isti */
+     #scan-group-list, #all-days-list-rendered, #search-results ul, #search-results-all-days ul { list-style: none; padding: 0; margin: 0; }
+     #scan-group-list li, #all-days-list-rendered li, #search-results li, #search-results-all-days li { background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background-color 0.2s ease; }
+     #scan-group-list li:hover, #all-days-list-rendered li:hover, #search-results li:hover, #search-results-all-days li:hover { background-color: #efefef; }
+     .scan-group-last-qr-time { font-size: 0.8em; color: #777; margin-left: 15px; flex-shrink: 0; }
+     .session-name-history { font-size: 1em; color: #00008B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
+     .scan-time-history { font-size: 1em; color: #333; white-space: nowrap; margin-left: 5px; }
+     #clear-history-btn.confirm-mode, #delete-session-btn.confirm-mode, #clear-day-btn.confirm-mode { background-color: yellow; color: black; }
+     #detail-scan-list { list-style: none; padding: 0; margin: 0; }
+     #detail-scan-list li {display: flex; justify-content: space-between; align-items: center; padding: 0.6em 0.2em; border-bottom: 1px solid #eee; font-size: 1.05em;}
+     #detail-scan-list li:last-child { border-bottom: none; }
+
+     /* Pretraga SVI DANI - sada unutar sticky headera */
+     #all-days-search-container { background-color: white; padding: 0.5em 0; margin-bottom: 0.2em; }
+     #all-days-search-container input { flex-grow: 1; padding: 0.5em; min-width: 50px; font-size: 0.9em; }
+     #all-days-search-container button { padding: 0.5em 0.6em; font-size: 0.9em; flex-shrink: 0; }
+
+     /* Pretraga JEDAN DAN - sada unutar sticky headera */
+      #search-container { display: none; padding: 1em 0; margin-bottom: 1em; }
+      #search-container > div:first-child { display: flex; gap: 10px; margin-bottom: 0.8em; }
+      #search-summary-info-day { display: none; justify-content: space-between; align-items: center; padding: 0.6em 0; font-size: 1.1em; margin-top: 0.8em; border-top: 1px solid #eee; }
+      #search-results { /* Ovaj div OSTAJE u #history-content */ }
+
+     /* Stilovi za prikaz dana/sesija u listi ostaju isti */
+     #all-days-list-rendered li { background-color: #f0f0f0; border: 1px solid #ccc; padding: 12px 15px; margin-bottom: 8px; }
+     #all-days-list-rendered li:hover { background-color: #e0e0e0; }
+
+     /* Sažetak i info elementi - unutar sticky headera */
+     #all-days-summary-info, #history-date-info, #history-summary-info, #detail-header-info, #detail-summary-info, #search-summary-info-day, #all-days-search-container { padding: 0.6em 0; margin-bottom: 0.5em; border-top: 1px solid #eee; }
+    /* Uklanjanje gornje linije za prvi element u dynamic headeru */
+     #history-dynamic-header-content > *:first-child { border-top: none; padding-top: 0; }
+
+     /* Specifični stilovi koji overrideaju gornje */
+     #all-days-summary-info, #search-summary-info-day { display: none; justify-content: space-between; align-items: center; font-size: 1.1em; }
+     #history-date-info, #history-summary-info, #detail-summary-info { display: flex; justify-content: space-between; align-items: center; font-size: 1.1em; }
+     #detail-header-info { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.5em; border-bottom: 1px solid #ccc; border-top: none; }
+     #detail-summary-info { border-top: none; }
+     #all-days-search-container { padding-bottom: 0.2em; border-bottom: 1px solid #eee; }
+     #search-container { display: none; border-bottom: 1px solid #eee; }
+
+    /* --- NOVI STILOVI --- */
+    #running-text-container { position: absolute; top: 4.8em; left: 0; width: 100%; overflow: hidden; white-space: nowrap; z-index: 2; pointer-events: none; display: none; }
+    #running-text-container span { display: inline-block; padding-left: 100%; font-size: 1.4em; font-weight: bold; color: yellow; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8); animation: marquee 10s linear infinite; white-space: pre; /* <<< DODANA OVA LINIJA */}
+    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+    #share-prompt-overlay {
+        position: absolute;
+        top: 7em;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: auto;
+        background-color: rgba(0, 0, 0, 0.75);
+        color: lightgreen;
+        font-size: 1.3em;
+        font-weight: bold;
+        text-align: center;
+        padding: 1.5em 1em;
+        border-radius: 10px;
+        z-index: 4;
+        display: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        line-height: 1.4;
+        align-items: center;
+        justify-content: center;
+    }
+    /* IZMJENA: Uklonjena pozadina kvačice */
+    #counter-deactivated-indicator { position: fixed; top: 10px; left: 10px; font-size: 1em; color: limegreen; background-color: transparent; z-index: 5; display: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+
+    /* NOVI Stil za gumb za promjenu kamere */
+    #switch-camera-btn {
+        position: fixed; /* Zaljepljen za ekran */
+        top: 10px;       /* Udaljenost od vrha */
+        right: 10px;     /* Udaljenost od desnog ruba */
+        z-index: 5;      /* Iznad #reader, ali ispod nekih poruka možda */
+        padding: 6px 8px; /* Malo veći padding */
+        background-color: rgba(0, 0, 0, 0.5); /* Poluprozirna pozadina */
+        color: white;
+        border: none;
+        border-radius: 50%; /* Okrugli gumb */
+        font-size: 1.4em;  /* Veličina ikonice */
+        line-height: 1;    /* Da ikonica bude centrirana */
+        cursor: pointer;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        display: none; /* Početno skriven, JS ga prikazuje */
+    }
+    #switch-camera-btn:active {
+        background-color: rgba(0, 0, 0, 0.7);
+    }
+
+    /* NOVI Stil za overlay s popisom kamera */
+    #camera-selection-overlay {
+        position: fixed; /* Zaljepljen za ekran */
+        top: 55px;       /* Ispod gumba (prilagodi ako treba) */
+        right: 10px;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 6;      /* Iznad gumba */
+        padding: 5px 0; /* Gore/dolje padding */
+        display: none;   /* Početno skriven */
+        max-height: 150px; /* Ograničenje visine ako ima puno kamera */
+        overflow-y: auto; /* Scroll ako treba */
+        min-width: 150px; /* Minimalna širina */
+    }
+    #camera-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    #camera-list li {
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 0.9em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #camera-list li:hover {
+        background-color: #f0f0f0;
+    }
+    #camera-list li.selected-camera { /* Opcionalno: za označavanje trenutne */
+        font-weight: bold;
+        background-color: #e0e0e0;
+    }
 
     /* --- MANUAL ENTRY MODAL CSS --- */
     #manual-entry-modal-overlay {
@@ -989,6 +1148,10 @@ function normalizeDateForSearch(input) {
         if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij overlay
         if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri init skenera
         if (duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri init skenera
+        // Sakrij modal za ručni unos ako je otvoren
+         if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') {
+             hideManualEntryModal(); // Sakrij bez zvuka otkazivanja
+         }
 
 
         checkSharePrompt();
@@ -1849,7 +2012,7 @@ function normalizeDateForSearch(input) {
                              ukupno = unsavedToImport.amount;
                              currentSessionName = unsavedToImport.currentName;
                              // Spremi uvezeno nesačuvano stanje u localStorage (kao da je upravo skenirano)
-                             try { localStorage.setItem(UNSAVED_COUNT_KEY, povijest.length); localStorage.setItem(UNSAVED_AMOUNT_KEY, ukupno); } catch (lsError) { console.error("Greška spremanja uvezenog nesačuvanog stanja u localStorage:", lsError); }
+                             try { localStorage.setItem(UNSAVED_COUNT_KEY, povijest.length); localStorage.setItem(UNSAVED_AMOUNT_KEY, ukupno); } catch (lsError) { console.error("Greška spremanja uvezenog nesačivanog stanja u localStorage:", lsError); }
                          } else {
                              // Ako nema nesačuvanog stanja u datoteci, resetiraj trenutnu sesiju
                              povijest = [];
@@ -2322,3 +2485,5 @@ function normalizeDateForSearch(input) {
 
 </body>
 </html>
+
+

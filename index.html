@@ -510,7 +510,7 @@
     const COUNTER2_KEY = 'qrCalculatorCounter2';
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     // AŽURIRAN URL S NOVIM KOJI SI POSLAO
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA/exec'; // <-- ISPRAVNI URL TVOJE WEB APLIKACIJE
     const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // OSIGURANO DA JE GLOBALNO DEFINIRANO
 
     let ukupno = 0;
@@ -724,7 +724,7 @@ function normalizeDateForSearch(input) {
     // Funkcija za slanje log podataka
     async function sendLogData(eventData) {
       // console.log("Pokušavam poslati log:", eventData.Event); // KOMENTIRANO: Previše logova
-      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE')) { // Dodana provjera i za placeholder
           console.warn("Logovanje onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
           return;
       }
@@ -766,7 +766,7 @@ function normalizeDateForSearch(input) {
     function saveCounterActiveState() { localStorage.setItem(COUNTER_ACTIVE_KEY, isCounterDecrementActive); }
 
     // *** FUNKCIJE ZA DOHVAĆANJE PODATAKA IZ SHEETA ***
-    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE') || APPS_SCRIPT_URL.includes('AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA')) { // Dodana provjera i za stari URL
+    async function fetchSheetData() { console.log("Pokušavam dohvatiti podatke iz Google Sheeta..."); if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('URL_TVOJE_WEB_APLIKACIJE')) { // Dodana provjera i za placeholder
          console.warn("Dohvaćanje iz Sheeta onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
          tekstPoruka = "";
          initializeCounters();
@@ -2557,9 +2557,17 @@ function normalizeDateForSearch(input) {
              } else { /* console.log("Nema nesačuvane sesije za logovanje."); */ } /* KOMENTIRANO: Previše logova */ } catch (lsError) { console.error("Greška čitanja nesačuvanog stanja iz localStorage:", lsError); } // Ostavljen log greške
 
             // Logiraj uspješno učitavanje (uključujući info o nesačuvanom)
-            const appLoadedDetails = { previousSession: previousSessionDetails };
-            const appLoadedEventData = { Event: 'app_loaded', Details: JSON.stringify(appLoadedDetails) };
-            sendLogData(appLoadedEventData);
+            // Logiraj app_loaded SAMO jednom po sesiji preglednika (tab/prozor)
+            if (!sessionStorage.getItem('appLoadedLogged')) {
+                const appLoadedDetails = { previousSession: previousSessionDetails };
+                const appLoadedEventData = { Event: 'app_loaded', Details: JSON.stringify(appLoadedDetails) };
+                console.log("Šaljem 'app_loaded' log prvi put u ovoj sesiji."); // Dodani log
+                sendLogData(appLoadedEventData);
+                sessionStorage.setItem('appLoadedLogged', 'true'); // Postavi flag u sessionStorage
+            } else {
+                console.log("'app_loaded' log je već poslan u ovoj sesiji, preskačem."); // Dodani log
+            }
+
 
             // Ažuriraj UI koji ovisi o sheet podacima
             updateRunningText();
@@ -2578,10 +2586,13 @@ function normalizeDateForSearch(input) {
         }).catch(error => {
              console.error("Greška tijekom pozadinskog dohvaćanja podataka:", error); // Ostavljen log greške
              // Logiraj grešku pri učitavanju (uključujući info o nesačuvanom)
+             // Ovdje NE provjeravamo sessionStorage jer želimo logirati grešku PRI SVAKOM POKUŠAJU UČITAVANJA ako dođe do greške
              let previousSessionDetailsOnError = null;
              try { const unsavedCount = localStorage.getItem(UNSAVED_COUNT_KEY); const unsavedAmount = localStorage.getItem(UNSAVED_AMOUNT_KEY); if (unsavedCount !== null && unsavedAmount !== null) { const count = parseInt(unsavedCount, 10); const amount = parseFloat(unsavedAmount); if (!isNaN(count) && !isNaN(amount) && count >= 0 && count > 0) { previousSessionDetailsOnError = { count: count, amount: amount, name: currentSessionName || null }; } } } catch (lsError) { /* Ignoriši */ }
              const appLoadedErrorEventData = { Event: 'app_loaded', Details: JSON.stringify({ previousSession: previousSessionDetailsOnError, fetchError: error.toString() }) };
+             console.log("Šaljem 'app_loaded' log (nakon greške dohvaćanja Sheeta)."); // Dodani log
              sendLogData(appLoadedErrorEventData);
+
 
              console.log("Inicijalizacija završena (s greškom pozadinskog dohvaćanja)."); // Ostavljen ovaj log
              // I dalje ažuriraj UI koji ne ovisi o sheet podacima ili koristi default/spremljene vrijednosti

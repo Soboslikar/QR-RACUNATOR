@@ -510,7 +510,7 @@
     const COUNTER2_KEY = 'qrCalculatorCounter2';
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     // AŽURIRAN URL S NOVIM KOJI SI POSLAO
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
     const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // OSIGURANO DA JE GLOBALNO DEFINIRANO
 
     let ukupno = 0;
@@ -554,11 +554,14 @@
     // NOVI DOM Element za Import file input
     let importFileInput;
 
-
-    // --- VARIJABLE ZA KONTROLU ZVUKOVA I PORUKA ---
+    // --- VARIJABLE ZA KONTROLU ZVUKOVA, PORUKA I LOGOVA ---
     let errorSoundCooldown = false; // Flag za spriječavanje prebrzog ponavljanja error zvuka (0.5s cooldown)
     let ignoreErrorSoundUntil = 0; // Timestamp do kojeg ignoriramo error zvuk i poruku nakon uspješnog skena (2s delay)
     let messageTimeoutId = null; // ID timeouta za poruku "UČITANO" ili "DUPLIKAT"
+
+    // NOVO: Cooldown za slanje duplicate logova (neovisno o zvuku/poruci, ali aktivira se kad bi se inače pustio zvuk/poruka)
+    let ignoreDuplicateLogUntil = 0;
+    const DUPLICATE_LOG_COOLDOWN = 5000; // Logiraj duplikat max jednom svakih 5 sekundi
     // -----------------------------------
 
 
@@ -1117,18 +1120,31 @@ function normalizeDateForSearch(input) {
             if (isDuplicateInCurrent || isDuplicateInRecentSaved) {
                  console.warn("Duplikat pronađen:", decodedText);
 
-                 // Provjeri je li prošla odgoda od zadnjeg uspješnog skena (2 sekunde)
+                 // Provjeri je li prošla odgoda od zadnjeg uspješnog skena (2 sekunde) - OVO OSTAJE ZA ZVUK/PORUKU KORISNIKU
                  if (Date.now() >= ignoreErrorSoundUntil) {
                      // Ako je prošla odgoda, sviraj error (uz 0.5s cooldown) i prikaži poruku duplikata
                      playSound('error-sound');
                      showTemporaryMessage(duplicateWarning, "TAJ RAČUN JE URAČUNAT", 1500);
+
+                     // NOVO: Provjeri je li prošao cooldown za logiranje duplikata
+                     if (Date.now() >= ignoreDuplicateLogUntil) {
+                         // Logiranje duplikata (BEZ DETALJA) - MODIFICIRANO
+                         sendLogData({ Event: 'scan_duplicate' }); // <-- IZMJENA: Bez Details polja
+
+                         // Postavi cooldown za logiranje duplikata (npr. 5 sekundi)
+                         ignoreDuplicateLogUntil = Date.now() + DUPLICATE_LOG_COOLDOWN;
+                         console.log(`Duplicate log sent. Next duplicate log ignored until ${new Date(ignoreDuplicateLogUntil).toLocaleTimeString()} (global cooldown).`);
+                     } else {
+                          // console.log("Duplicate log skipped due to global cooldown."); // KOMENTIRANO: Previše logova
+                     }
+
                  } else {
-                     // console.log(`Duplicate ignored temporarily due to recent successful scan (until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}).`); // KOMENTIRANO: Previše logova
+                     // User notification (sound/message) is suppressed due to recent successful scan.
+                     // No user feedback means no need to log it as a "notified duplicate".
+                     // console.log(`Duplicate ignored temporarily due to recent successful scan (until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}). No log sent.`); // KOMENTIRANO: Previše logova
                  }
-                 // Logiranje duplikata (samo tip, bez cijelog QR koda/linka) - MODIFICIRANO
-                 const duplicateType = isDuplicateInCurrent ? 'current_session' : 'saved_history';
-                 const duplicateDetails = { type: duplicateType };
-                 sendLogData({ Event: 'scan_duplicate', Details: JSON.stringify(duplicateDetails) }); // <-- IZMJENA
+
+
                  return; // Ne obrađuj duplikat
             }
 
@@ -1679,7 +1695,7 @@ function normalizeDateForSearch(input) {
         console.log("switchToScannerView: Pokrenuto."); // Ostavljen ovaj log
         if (document.body.classList.contains('scanner-view')) {
             // console.log("switchToScannerView: Već u scanner view."); // KOMENTIRANO: Previše logova
-            // Ako je već u scanner view, samo provjeri i pokreni skener ako nije aktivan
+            // Ako je već aktivan i u scanner view, samo provjeri i pokreni skener ako nije aktivan
             if (!isScannerActive) {
                 console.log("switchToScannerView: Skener nije aktivan, inicijaliziram..."); // Ostavljen ovaj log
                  // initializeScanner će automatski provjeriti history view i isScannerActive
@@ -2579,7 +2595,7 @@ function normalizeDateForSearch(input) {
         }).catch(error => {
              console.error("Greška tijekom pozadinskog dohvaćanja podataka:", error); // Ostavljen log greške
              // Logiraj grešku pri učitavanju (bez info o nesačuvanom) - MODIFICIRANO
-             const appLoadedErrorEventData = { Event: 'app_loaded', Details: JSON.stringify({ status: 'error', fetchError: error.toString() }) }; // Status s greškom
+             const appLoadedErrorEventData = { Event: 'app_loaded', Details: JSON.stringify({ status: 'error', fetchError: error.toString() }) };
              sendLogData(appLoadedErrorEventData); // <-- IZMJENA
 
              console.log("Inicijalizacija završena (s greškom pozadinskog dohvaćanja)."); // Ostavljen ovaj log

@@ -510,7 +510,7 @@
     const COUNTER2_KEY = 'qrCalculatorCounter2';
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     // AŽURIRAN URL S NOVIM KOJI SI POSLAO
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
     const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // OSIGURANO DA JE GLOBALNO DEFINIRANO
 
     let ukupno = 0;
@@ -760,7 +760,7 @@ function normalizeDateForSearch(input) {
     // *** FUNKCIJE ZA LOKALNU POHRANU ***
     function saveFullHistoryToLocalStorage(fullHistory) { try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(fullHistory)); console.log("Puna povijest spremljena."); } catch (error) { console.error("Greška spremanja:", error); alert("Greška: Nije moguće spremiti povijest."); } }
     function loadFullHistoryFromLocalStorage() { try { const historyJson = localStorage.getItem(HISTORY_STORAGE_KEY); if (historyJson) { const loadedHistory = JSON.parse(historyJson); return loadedHistory.map(group => ({ timestamp: group.timestamp || Date.now(), lastQrTime: group.lastQrTime || '??:??', name: group.name || null, racuni: Array.isArray(group.racuni) ? group.racuni.map(item => ({ ...item, scanTimestamp: item.scanTimestamp || 0 })) : [] })); } return []; } catch (error) { console.error("Greška učitavanja:", error); return []; } }
-    function loadCountersState() { const storedBrojac = localStorage.getItem(COUNTER_KEY); const storedBrojac2 = localStorage.getItem(COUNTER2_KEY); const storedActive = localStorage.getItem(COUNTER_ACTIVE_KEY); brojac = storedBrojac !== null ? parseInt(storedBrojac, 10) : null; brojac2 = storedBrojac2 !== null ? parseInt(storedBrojac2, 10) : 0; isCounterDecrementActive = storedActive !== null ? (storedActive === 'true') : true; if (isNaN(brojac)) brojac = null; if (isNaN(brojac2)) brojac2 = 0; console.log("Učitano stanje:", { brojac, brojac2, isCounterDecrementActive }); updateDeactivatedIndicator(); }
+    function loadCountersState() { const storedBrojac = localStorage.getItem(COUNTER_KEY); const storedBrojac2 = localStorage.getItem(COUNTER2_KEY); const storedActive = localStorage.getItem(COUNTER_ACTIVE_KEY); brojac = storedBrojac !== null ? parseInt(storedBrojac, 10) : null; brojac2 = storedBrojac2 !== null ? parseInt(storedBrojac2, 0) : 0; isCounterDecrementActive = storedActive !== null ? (storedActive === 'true') : true; if (isNaN(brojac)) brojac = null; if (isNaN(brojac2)) brojac2 = 0; console.log("Učitano stanje:", { brojac, brojac2, isCounterDecrementActive }); updateDeactivatedIndicator(); }
     function saveBrojac() { localStorage.setItem(COUNTER_KEY, brojac); }
     function saveBrojac2() { localStorage.setItem(COUNTER2_KEY, brojac2); }
     function saveCounterActiveState() { localStorage.setItem(COUNTER_ACTIVE_KEY, isCounterDecrementActive); }
@@ -1125,7 +1125,10 @@ function normalizeDateForSearch(input) {
                  } else {
                      // console.log(`Duplicate ignored temporarily due to recent successful scan (until ${new Date(ignoreErrorSoundUntil).toLocaleTimeString()}).`); // KOMENTIRANO: Previše logova
                  }
-                 sendLogData({ Event: 'scan_duplicate', Details: decodedText }); // Log duplikata
+                 // Logiranje duplikata (samo tip, bez cijelog QR koda/linka) - MODIFICIRANO
+                 const duplicateType = isDuplicateInCurrent ? 'current_session' : 'saved_history';
+                 const duplicateDetails = { type: duplicateType };
+                 sendLogData({ Event: 'scan_duplicate', Details: JSON.stringify(duplicateDetails) }); // <-- IZMJENA
                  return; // Ne obrađuj duplikat
             }
 
@@ -1137,7 +1140,7 @@ function normalizeDateForSearch(input) {
 
             if (instructionDiv) instructionDiv.style.display = 'none';
             const newItem = { amount: iznosEura, qrCode: decodedText, time: time, datv: datv || '', scanTimestamp: Date.now() };
-            povijest.push(newItem);
+            povijest.push(newItem); // Račun se dodaje PRVI
             ukupno += iznosEura;
 
             if (isCounterDecrementActive && brojac > 0) { brojac--; console.log("Brojač smanjen na:", brojac); saveBrojac(); checkSharePrompt(); } else { /* console.log("Brojač nije smanjen. Aktivno:", isCounterDecrementActive, "Vrijednost:", brojac); */ } // KOMENTIRANO: Previše logova
@@ -1155,9 +1158,13 @@ function normalizeDateForSearch(input) {
             showTemporaryMessage(loadedMsg, "UČITANO", 1000); // Prikaži poruku "UČITANO"
             if (deleteWarningDiv) { deleteWarningDiv.dataset.lastScanText = `ZADNJI RAČUN: ${newItem.time} = ${newItem.amount.toFixed(2)} €`; handleInfoDeleteMessageVisibility(); }
 
-             // Logiraj uspješan sken
-             const scanDetails = { amount: newItem.amount, time: newItem.time };
-             sendLogData({ Event: 'scan_success', Details: JSON.stringify(scanDetails) });
+             // Logiraj uspješan sken - MODIFICIRANO
+             const scanDetails = {
+                 amount: newItem.amount,
+                 time: newItem.time,
+                 sessionInvoiceNumber: povijest.length // <-- Dodano: Broj računa po redu
+             };
+             sendLogData({ Event: 'scan_success', Details: JSON.stringify(scanDetails) }); // <-- IZMJENA
 
 
         } catch (error) {
@@ -1179,7 +1186,7 @@ function normalizeDateForSearch(input) {
             // if (duplicateWarning) duplicateWarning.style.display = 'none';
 
              // Logiraj grešku skeniranja
-            sendLogData({ Event: 'scan_parse_error', Details: { message: error.message, qrCode: decodedText } });
+            sendLogData({ Event: 'scan_parse_error', Details: { message: error.message, qrCodeStart: decodedText.substring(0, 50) + '...' } }); // Logiraj samo dio QR koda
         }
     }
 
@@ -1608,7 +1615,7 @@ function normalizeDateForSearch(input) {
         };
 
         // Dodavanje u povijest (trenutna sesija)
-        povijest.push(newItem);
+        povijest.push(newItem); // Račun se dodaje PRVI
         ukupno += parsedAmount;
 
         // Smanjenje brojača ako je aktivno
@@ -1645,9 +1652,14 @@ function normalizeDateForSearch(input) {
         // Sakrij modal
         hideManualEntryModal();
 
-         // Logiranje ručnog unosa
-         const manualEntryDetails = { amount: parsedAmount, time: parsedTime };
-         sendLogData({ Event: 'manual_entry_added', Details: JSON.stringify(manualEntryDetails) });
+         // Logiranje ručnog unosa - MODIFICIRANO
+         const manualEntryDetails = {
+             amount: parsedAmount,
+             time: parsedTime,
+             sessionInvoiceNumber: povijest.length, // <-- Dodano: Broj računa po redu
+             isManual: true // <-- Dodano: Oznaka da je ručni unos
+         };
+         sendLogData({ Event: 'manual_entry_added', Details: JSON.stringify(manualEntryDetails) }); // <-- IZMJENA
     }
 
     function cancelManualEntry() {
@@ -2544,22 +2556,11 @@ function normalizeDateForSearch(input) {
         // Callback dohvaćanja podataka ažurira UI elemente koji ovise o podacima iz Sheeta
         fetchSheetData().then(() => {
             console.log("Sheet podaci dohvaćeni. Pripremam 'app_loaded' log."); // Ostavljen ovaj log
-            let previousSessionDetails = null;
-            try { const unsavedCount = localStorage.getItem(UNSAVED_COUNT_KEY); const unsavedAmount = localStorage.getItem(UNSAVED_AMOUNT_KEY); if (unsavedCount !== null && unsavedAmount !== null) { const count = parseInt(unsavedCount, 10); const amount = parseFloat(unsavedAmount); if (!isNaN(count) && !isNaN(amount) && count >= 0 && count > 0) { // Samo logiraj ako ima barem 1 nesačivan račun
-                    console.log("Pronađena nesačuvana sesija:", count, amount); // Ostavljen ovaj log
-                    previousSessionDetails = { count: count, amount: amount, name: currentSessionName || null }; // Dodaj ime sesije u log
-                    // Ne brišemo nesačuvano stanje ovdje, ono ostaje dok se sesija ne spremi ili obriše eksplicitno
-                    // console.log("Nesačuvano stanje pročitano za log."); // KOMENTIRANO: Previše logova
-                } else {
-                     // console.log("Nema validne nesačuvane sesije za logovanje ili prazna."); // KOMENTIRANO: Previše logova
-                     // Možda ipak očistiti nevalidne/prazne? Za sada ne buni, ostavljamo.
-                }
-             } else { /* console.log("Nema nesačuvane sesije za logovanje."); */ } /* KOMENTIRANO: Previše logova */ } catch (lsError) { console.error("Greška čitanja nesačuvanog stanja iz localStorage:", lsError); } // Ostavljen log greške
 
-            // Logiraj uspješno učitavanje (uključujući info o nesačuvanom)
-            const appLoadedDetails = { previousSession: previousSessionDetails };
+            // Logiraj uspješno učitavanje (bez info o nesačuvanom) - MODIFICIRANO
+            const appLoadedDetails = { status: 'ok', fetchSuccess: true }; // Jednostavni status
             const appLoadedEventData = { Event: 'app_loaded', Details: JSON.stringify(appLoadedDetails) };
-            sendLogData(appLoadedEventData);
+            sendLogData(appLoadedEventData); // <-- IZMJENA
 
             // Ažuriraj UI koji ovisi o sheet podacima
             updateRunningText();
@@ -2577,11 +2578,9 @@ function normalizeDateForSearch(input) {
             console.log("Inicijalizacija (pozadinska obrada) završena."); // Ostavljen ovaj log
         }).catch(error => {
              console.error("Greška tijekom pozadinskog dohvaćanja podataka:", error); // Ostavljen log greške
-             // Logiraj grešku pri učitavanju (uključujući info o nesačuvanom)
-             let previousSessionDetailsOnError = null;
-             try { const unsavedCount = localStorage.getItem(UNSAVED_COUNT_KEY); const unsavedAmount = localStorage.getItem(UNSAVED_AMOUNT_KEY); if (unsavedCount !== null && unsavedAmount !== null) { const count = parseInt(unsavedCount, 10); const amount = parseFloat(unsavedAmount); if (!isNaN(count) && !isNaN(amount) && count >= 0 && count > 0) { previousSessionDetailsOnError = { count: count, amount: amount, name: currentSessionName || null }; } } } catch (lsError) { /* Ignoriši */ }
-             const appLoadedErrorEventData = { Event: 'app_loaded', Details: JSON.stringify({ previousSession: previousSessionDetailsOnError, fetchError: error.toString() }) };
-             sendLogData(appLoadedErrorEventData);
+             // Logiraj grešku pri učitavanju (bez info o nesačuvanom) - MODIFICIRANO
+             const appLoadedErrorEventData = { Event: 'app_loaded', Details: JSON.stringify({ status: 'error', fetchError: error.toString() }) }; // Status s greškom
+             sendLogData(appLoadedErrorEventData); // <-- IZMJENA
 
              console.log("Inicijalizacija završena (s greškom pozadinskog dohvaćanja)."); // Ostavljen ovaj log
              // I dalje ažuriraj UI koji ne ovisi o sheet podacima ili koristi default/spremljene vrijednosti

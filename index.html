@@ -228,7 +228,16 @@
 
     /* --- NOVI STILOVI --- */
     #running-text-container { position: absolute; top: 4.8em; left: 0; width: 100%; overflow: hidden; white-space: nowrap; z-index: 2; pointer-events: none; display: none; }
-    #running-text-container span { display: inline-block; padding-left: 100%; font-size: 1.4em; font-weight: bold; color: yellow; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8); white-space: pre; /* <<< DODANA OVA LINIJA */}
+    #running-text-container span {
+      display: inline-block;
+      padding-left: 100%; /* Ovo ostaje da se tekst pomiče preko cijelog ekrana */
+      font-size: 1.4em;
+      font-weight: bold;
+      color: yellow;
+      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+      /* animation: marquee 25s linear infinite;  <-- IZBRIŠI OVU LINIJU - TRAJANJE SE SADA POSTAVLJA U JS-U */
+      white-space: pre; /* <<< DODANA OVA LINIJA */
+    }
     @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
     #share-prompt-overlay {
@@ -511,7 +520,7 @@
     const COUNTER2_KEY = 'qrCalculatorCounter2';
     const COUNTER_ACTIVE_KEY = 'qrCalculatorCounterActive';
     // AŽURIRAN URL S NOVIM KOJI SI POSLAO
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtiYeV9fhn0jyN5vFEYjfBBd5IAj5E96SF2Jh2bGMMqcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwCM5SreGB0O-YjGW_xzyxtYeV9fhn0jyN5vFEYjfBBd5IA5E96SF2Jh2bGMMcnA/exec'; // <-- DODANO/IZMIJENJENO: Ispravljen URL
     const CAMERA_ID_KEY = 'qrCalculatorSelectedCameraID'; // OSIGURANO DA JE GLOBALNO DEFINIRANO
 
     let ukupno = 0;
@@ -774,7 +783,7 @@ function normalizeDateForSearch(input) {
          console.warn("Dohvaćanje iz Sheeta onemogućeno: APPS_SCRIPT_URL nije postavljen ili je neispravan.");
          tekstPoruka = "";
          initializeCounters();
-         updateRunningText();
+         updateRunningText(); // Ovo će sada ispravno prikazati ili sakriti tekst
          return Promise.reject(new Error("URL za Sheet nije postavljen/ispravan"));
     } try { const response = await fetch(APPS_SCRIPT_URL); if (!response.ok) { throw new Error(`HTTP greška ${response.status}`); } const data = await response.json(); console.log("Podaci dohvaćeni:", data); let newPrag = data.pragBrojac !== undefined ? parseInt(data.pragBrojac, 10) : 0; if (isNaN(newPrag) || newPrag < 0) { newPrag = 0; } else if (newPrag > 500) { newPrag = 500; } brojac2 = newPrag; saveBrojac2(); tekstPoruka = data.trceciTekst || ""; initializeCounters(); updateRunningText(); return Promise.resolve(); } catch (error) { console.error("Greška pri dohvaćanju podataka iz Sheeta:", error); tekstPoruka = ""; initializeCounters(); updateRunningText(); return Promise.reject(error); } }
 
@@ -796,7 +805,8 @@ function normalizeDateForSearch(input) {
              deleteWarningDiv.style.display = 'none';
         }
     }
-     // MODIFICIRANA updateRunningText: Sada izračunava trajanje animacije za fiksnu brzinu
+
+    // --- IZMJENJENA FUNKCIJA: updateRunningText - Sada izračunava trajanje animacije za fiksnu brzinu ---
     function updateRunningText() {
          // console.log("updateRunningText: Pokrenuto."); // KOMENTIRANO: Previše logova
 
@@ -828,8 +838,12 @@ function normalizeDateForSearch(input) {
          const wasHidden = runningTextContainer.style.display === 'none' || runningTextSpan.style.display === 'none';
 
          if (wasHidden) {
-             runningTextContainer.style.display = 'block'; // Mora biti 'block' da se može izmjeriti širina djeteta s padding: 100%
-             runningTextSpan.style.display = 'inline-block'; // Mora biti display: koji dozvoljava mjerenje (inline-block je iz CSS-a)
+             // Da bi offsetWidth ispravno radio s padding-left: 100%, kontejner mora biti vidljiv.
+             // Također se pobrini da span unutra ima display koji omogućava mjerenje širine (inline-block je u CSS-u, ali provjeravamo).
+             const tempDisplay = runningTextContainer.style.display === 'none' ? 'block' : runningTextContainer.style.display; // Ako je bio 'none', postavi ga na 'block' privremeno
+             runningTextContainer.style.display = tempDisplay;
+             // Osiguraj da span ima display koji omogućava offsetWidth (inline-block je iz CSS-a)
+             runningTextSpan.style.display = 'inline-block'; // Ovo bi već trebalo biti iz CSS-a, ali za svaki slučaj
              // console.log("updateRunningText: Privremeno prikazujem za mjerenje."); // KOMENTIRANO: Previše logova
          }
 
@@ -876,32 +890,49 @@ function normalizeDateForSearch(input) {
 
 
          // Ponovno primijeni animation svojstvo s izračunatim trajanjem
+         // Osiguraj da se animacija restartira. Resetirali smo je na 'none' na početku.
+         // Sada je ponovno postavljamo. requestAnimationFrame može pomoći osigurati reflow.
+         runningTextSpan.style.animation = 'none'; // Ponovno resetiraj
+         runningTextSpan.offsetHeight; // Forsiraj reflow
          runningTextSpan.style.animation = `marquee ${durationSeconds}s linear infinite`;
+
 
          // Ažuriraj vidljivost kontejnera na temelju stanja aplikacije (tekst postoji, nije otvoren modal, nije vidljiv share prompt, itd.)
          updateRunningTextVisibility();
          // console.log("updateRunningText: Završeno, pozvana updateRunningTextVisibility."); // KOMENTIRANO: Previše logova
     }
+    // --- KRAJ IZMJENJENE FUNKCIJE ---
 
-    // MODIFICIRANA checkSharePrompt: Dodana provjera za modal ručnog unosa
-    function checkSharePrompt() {
-         const isManualEntryModalOpen = manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex';
-         const shouldShowPrompt = brojac === 0 && brojac2 > 0 &&
-                                   !isManualEntryModalOpen && // NE prikazuj ako je modal otvoren
-                                   document.body.classList.contains('scanner-view');
-         if (sharePromptOverlay) {
-             sharePromptOverlay.style.display = shouldShowPrompt ? 'flex' : 'none';
-             updateRunningTextVisibility(); // Ažuriraj i tekst koji trči
-         }
-    }
 
-    // MODIFICIRANA updateDeactivatedIndicator: Dodana provjera za modal ručnog unosa
-    function updateDeactivatedIndicator() {
+    // --- IZMJENJENA FUNKCIJA: updateRunningTextVisibility - Samo kontrolira display kontejnera ---
+     function updateRunningTextVisibility() {
+         // console.log("updateRunningTextVisibility: Pokrenuto."); // KOMENTIRANO: Previše logova
          const isManualEntryModalOpen = manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex';
-         if (counterDeactivatedIndicator) {
-             counterDeactivatedIndicator.style.display = (!isCounterDecrementActive && document.body.classList.contains('scanner-view') && !isManualEntryModalOpen) ? 'block' : 'none';
+         const shouldShowText = tekstPoruka && // Prikazuj samo ako ima teksta
+                                (!sharePromptOverlay || sharePromptOverlay.style.display === 'none') && // I ako share prompt nije vidljiv
+                                !isManualEntryModalOpen && // I ako modal za ručni unos nije otvoren
+                                document.body.classList.contains('scanner-view'); // I ako smo u prikazu skenera
+         // console.log(`updateRunningTextVisibility: shouldShowText = ${shouldShowText} (Tekst: ${!!tekstPoruka}, SharePrompt hidden: ${!sharePromptOverlay || sharePromptOverlay.style.display === 'none'}, ManualModal open: ${isManualEntryModalOpen}, ScannerView: ${document.body.classList.contains('scanner-view')})`); // KOMENTIRANO: Previše logova
+
+         if (runningTextContainer) {
+             const currentDisplay = runningTextContainer.style.display;
+             const newDisplay = shouldShowText ? 'block' : 'none';
+
+             // Mijenjaj display samo ako je potrebno
+             if (currentDisplay !== newDisplay) {
+                 runningTextContainer.style.display = newDisplay;
+                 // console.log(`updateRunningTextVisibility: Promijenjen display kontejnera na: ${newDisplay}`); // KOMENTIRANO: Previše logova
+             } else {
+                  // console.log("updateRunningTextVisibility: Display kontejnera nije promijenjen."); // KOMENTIRANO: Previše logova
+             }
+
+             // Uklonjen: Kod za forsiranje ponovnog pokretanja animacije.
+             // Animacija i njeno trajanje se sada postavljaju samo u updateRunningText().
+         } else {
+              console.error("updateRunningTextVisibility: Nedostaje DOM element #running-text-container."); // Ostavljen kritičan log
          }
-    }
+     }
+     // --- KRAJ IZMJENJENE FUNKCIJE ---
 
 
     // *** FUNKCIJE ZA RESETIRANJE STANJA GUMBA ***
@@ -1104,8 +1135,8 @@ function normalizeDateForSearch(input) {
         } else {
             // Ovo je drugi klik - POTVRDA spremanja/čišćenja
             ocistiTrenutnoSkeniranje(); // Ova funkcija ne svira zvuk, samo sprema i resetira varijable
-            resetOcistiMode(); // Resetira stanje gumba *PRIJE* zvuka
-            playSound('clear-session-sound'); // Zvuk na POTVRDU spremanja/čišćenja (čišćenje.mp3) - sada je ovdje
+            resetOcistiMode(); // Resetira stanje gumbš *PRIJE* zvuka
+            playSound('clear-session-sound'); // ZVUK NA POTVRDU SPREMANJA/ČIŠĆENJA (čišćenje.mp3) - sada je ovdje
         }
     }
 
@@ -1420,7 +1451,7 @@ function normalizeDateForSearch(input) {
         if (cameraSelectionOverlay) cameraSelectionOverlay.style.display = 'none'; // Sakrij overlay
         if (loadedMsg) loadedMsg.style.display = 'none'; // Sakrij poruke pri init skenera
         if (duplicateWarning) duplicateWarning.style.display = 'none'; // Sakrij duplicate warning pri init skenera
-        // Sakrij modal za ručni unos ako je otvoren
+         // Sakrij modal za ručni unos ako je otvoren
          if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') {
              hideManualEntryModal(); // Sakrij bez zvuka otkazivanja
          }
@@ -2016,7 +2047,7 @@ function normalizeDateForSearch(input) {
                         currentlyViewedDate = new Date(); currentlyViewedDate.setHours(0,0,0,0);
                         loadCountersState(); // Brojači će biti null -> reset na 0
                         initializeUserTracking(); // User ID će biti novi
-                        // Ponovno dohvati podatke iz Sheeta, ovo će ažurirati tekst poruke i brojač2
+                        // Ponovno dohvati podatke iz Sheeta, ovo će ažurirati tekst poruka i brojač2
                         fetchSheetData().then(() => { renderAllDaysView(); }).catch(() => { renderAllDaysView(); });
                         playSound('remove-sound'); // ZVUK ZA BRISANJE CIJELE POVIJESTI (smeće.mp3)
                     }
@@ -2425,7 +2456,7 @@ function normalizeDateForSearch(input) {
 
 
         // Provjera osnovnih elemenata (uključujući nove)
-        if (!readerDiv || !historyPageDiv || !historyContentDiv || !backToScannerButton || !historyToggleButton || !sessionNameContainer || !historyStickyHeaderDiv || !historyDynamicHeaderContentDiv || !runningTextContainer || !sharePromptOverlay || !counterDeactivatedIndicator || !loadedMsg || !duplicateWarning || !switchCameraButton || !cameraSelectionOverlay || !cameraListUl || !manualEntryBtn || !manualEntryModalOverlay || !manualAmountInput || !manualTimeInput || !manualAddBtn || !manualCancelBtn || !manualEntryErrorMsg || !importFileInput) {
+        if (!readerDiv || !historyPageDiv || !historyContentDiv || !backToScannerButton || !historyToggleButton || !sessionNameContainer || !historyStickyHeaderDiv || !historyDynamicHeaderContentDiv || !runningTextContainer || !runningTextSpan || !sharePromptOverlay || !counterDeactivatedIndicator || !loadedMsg || !duplicateWarning || !switchCameraButton || !cameraSelectionOverlay || !cameraListUl || !manualEntryBtn || !manualEntryModalOverlay || !manualAmountInput || !manualTimeInput || !manualAddBtn || !manualCancelBtn || !manualEntryErrorMsg || !importFileInput) {
             console.error("GREŠKA: Nedostaju kritični DOM elementi! Provjerite konzolu za detalje."); // Ostavljen kritičan log
              // Ispiši koji elementi nedostaju
             const missing = [];
@@ -2438,6 +2469,7 @@ function normalizeDateForSearch(input) {
             if (!historyStickyHeaderDiv) missing.push('#history-sticky-header');
             if (!historyDynamicHeaderContentDiv) missing.push('#history-dynamic-header-content');
             if (!runningTextContainer) missing.push('#running-text-container');
+            if (!runningTextSpan) missing.push('#running-text-container span'); // Dodana provjera za span
             if (!sharePromptOverlay) missing.push('#share-prompt-overlay');
             if (!counterDeactivatedIndicator) missing.push('#counter-deactivated-indicator');
             if (!loadedMsg) missing.push('#loaded-message');
@@ -2454,6 +2486,7 @@ function normalizeDateForSearch(input) {
             if (!manualEntryErrorMsg) missing.push('#manual-entry-error');
             if (!importFileInput) missing.push('#import-file-input'); // Provjera import inputa
 
+
             console.error("Nedostaju elementi:", missing.join(', ')); // Ostavljen kritičan log
 
             document.body.innerHTML = '<div style="padding: 20px; color: red; font-weight: bold;">Greška pri učitavanju aplikacije. Nedostaju ključni elementi. Osvježite stranicu ili provjerite konzolu za detalje.</div>';
@@ -2464,6 +2497,19 @@ function normalizeDateForSearch(input) {
 
         // Globalni listener i listeneri za standardne gumbe (Povijest, Share, itd.)
         document.body.addEventListener('click', globalClickListener, true);
+
+        // --- DODANO: Listener za promjenu veličine prozora (resize) ---
+         window.addEventListener('resize', () => {
+             // Ponovno izračunaj i primijeni trajanje animacije ako smo u prikazu skenera I tekst postoji
+             if (document.body.classList.contains('scanner-view') && tekstPoruka) {
+                 console.log("Window resized, recalculating running text animation duration."); // Ostavljen ovaj log
+                 updateRunningText(); // Ovo će ponovno izračunati trajanje i primijeniti animaciju
+             }
+             // Opcionalno: Kod za ponovno pokretanje kamere pri promjeni veličine, ako je potrebno na nekim uređajima/preglednicima
+             // Trenutna initializeScanner/visibilitychange logika bi trebala hendlati većinu slučajeva
+         });
+         // --- KRAJ DODANOG LISTENERA ---
+
 
         // Listener za gumb POVIJEST
         if (historyToggleButton) {
@@ -2648,7 +2694,7 @@ function normalizeDateForSearch(input) {
             sendLogData(appLoadedEventData); // <-- IZMJENA
 
             // Ažuriraj UI koji ovisi o sheet podacima
-            updateRunningText();
+            updateRunningText(); // Ovo će sada ispravno prikazati ili sakriti tekst i postaviti animaciju
             checkSharePrompt();
             updateDeactivatedIndicator(); // Ažuriraj indikator nakon učitavanja stanja aktivacije
 
@@ -2669,6 +2715,7 @@ function normalizeDateForSearch(input) {
 
              console.log("Inicijalizacija završena (s greškom pozadinskog dohvaćanja)."); // Ostavljen ovaj log
              // I dalje ažuriraj UI koji ne ovisi o sheet podacima ili koristi default/spremljene vrijednosti
+             tekstPoruka = ""; // Resetiraj tekst poruke na prazno ako dohvaćanje faila
              updateRunningText(); // Postavit će se na prazno
              checkSharePrompt(); // Prompt će se možda pokazati ako brojač1=0 i brojač2=0
              updateDeactivatedIndicator(); // Ovisno o localStorage stanju

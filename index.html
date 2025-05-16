@@ -796,23 +796,91 @@ function normalizeDateForSearch(input) {
              deleteWarningDiv.style.display = 'none';
         }
     }
-    function updateRunningText() { if (runningTextSpan) { runningTextSpan.textContent = tekstPoruka; } updateRunningTextVisibility(); }
+     // MODIFICIRANA updateRunningText: Sada izračunava trajanje animacije za fiksnu brzinu
+    function updateRunningText() {
+         // console.log("updateRunningText: Pokrenuto."); // KOMENTIRANO: Previše logova
 
-    // MODIFICIRANA updateRunningTextVisibility: Dodana provjera za modal ručnog unosa
-    function updateRunningTextVisibility() {
-        const isManualEntryModalOpen = manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex';
-        const shouldShowText = tekstPoruka &&
-                                (!sharePromptOverlay || sharePromptOverlay.style.display === 'none') &&
-                                !isManualEntryModalOpen && // NE prikazuj ako je modal otvoren
-                                document.body.classList.contains('scanner-view');
-        if (runningTextContainer) {
-            runningTextContainer.style.display = shouldShowText ? 'block' : 'none';
-            if (shouldShowText && runningTextSpan) {
-                runningTextSpan.style.animation = 'none';
-                runningTextSpan.offsetHeight;
-                runningTextSpan.style.animation = '';
-            }
-        }
+         if (!runningTextSpan || !runningTextContainer) {
+              console.error("updateRunningText: Nedostaju DOM elementi."); // Ostavljen kritičan log
+              return;
+         }
+
+         const text = tekstPoruka;
+
+         // Uvijek resetiraj animaciju prije potencijalnog skrivanja ili promjene teksta/trajanja
+         runningTextSpan.style.animation = 'none';
+         runningTextSpan.style.transform = 'none'; // Resetiraj transformaciju za svaki slučaj prije mjerenja
+
+         if (!text) {
+              // Ako nema teksta, osiguraj da je sve skriveno i zaustavi animaciju
+              runningTextSpan.textContent = ''; // Očisti tekstualni sadržaj
+              updateRunningTextVisibility(); // Sakrij kontejner (hendlano ovom funkcijom)
+              return; // Izađi, animacija nije potrebna
+         }
+
+         // Postavi tekstualni sadržaj
+         runningTextSpan.textContent = text;
+
+         // Privremeno prikaži kontejner i span za mjerenje, ako nisu već vidljivi
+         // Ovo je potrebno kako bi offsetWidth vratio ispravnu vrijednost
+         const initialContainerDisplay = runningTextContainer.style.display;
+         const initialSpanDisplay = runningTextSpan.style.display;
+         const wasHidden = runningTextContainer.style.display === 'none' || runningTextSpan.style.display === 'none';
+
+         if (wasHidden) {
+             runningTextContainer.style.display = 'block'; // Mora biti 'block' da se može izmjeriti širina djeteta s padding: 100%
+             runningTextSpan.style.display = 'inline-block'; // Mora biti display: koji dozvoljava mjerenje (inline-block je iz CSS-a)
+             // console.log("updateRunningText: Privremeno prikazujem za mjerenje."); // KOMENTIRANO: Previše logova
+         }
+
+         // Za forsiranje ponovnog iscrtavanja (reflow) preglednika
+         // Ovo osigurava da je preglednik izračunao novu širinu elementa nakon postavljanja teksta
+         runningTextSpan.offsetHeight;
+
+
+         // Izmjeri širinu span elementa *uključujući* padding-left: 100%.
+         // Ova vrijednost *je* ukupna udaljenost koju animacija s translateX(-100%) pokriva.
+         // (Širina elementa = širina teksta + padding-left + padding-right + borderi...)
+         // S padding-left: 100% i bez drugih paddinga/bordera, širina elementa je
+         // približno širina tekstualnog sadržaja + širina viewporta.
+         const totalScrollDistance = runningTextSpan.offsetWidth;
+         // console.log(`updateRunningText: Izmjerena ukupna širina (uklj. padding): ${totalScrollDistance}px`); // KOMENTIRANO: Previše logova
+
+
+         // Vrati početno stanje prikaza kontejnera *prije* pozivanja updateRunningTextVisibility.
+         // Ovo je ključno ako kontejner treba ostati skriven prema stanju aplikacije
+         // nakon mjerenja. updateRunningTextVisibility će tada postaviti konačno stanje prikaza.
+         if (wasHidden) {
+             runningTextContainer.style.display = initialContainerDisplay;
+             runningTextSpan.style.display = initialSpanDisplay; // Vrati i display spana za svaki slučaj, iako updateRunningTextVisibility kontrolira samo kontejner
+             // console.log("updateRunningText: Vraćam početni prikaz nakon mjerenja."); // KOMENTIRANO: Previše logova
+         }
+
+
+         // ODREDI ŽELJENU BRZINU U PIKSELIMA PO SEKUNDI
+         const desiredSpeedPxPerSec = 40; // Prilagodi ovu vrijednost da tekst ide brže ili sporije
+         // console.log("updateRunningText: Željena brzina:", desiredSpeedPxPerSec, "px/s"); // KOMENTIRANO: Previše logova
+
+
+         if (totalScrollDistance <= 0 || desiredSpeedPxPerSec <= 0) {
+             console.warn("updateRunningText: Ukupna širina ili željena brzina su nula/negativne, ne mogu izračunati trajanje animacije."); // Ostavljen log upozorenja
+             runningTextSpan.style.animation = 'none'; // Osiguraj da nema animacije
+             updateRunningTextVisibility(); // Ažuriraj prikaz kontejnera
+             return;
+         }
+
+         // Izračunaj trajanje animacije (u sekundama)
+         // Trajanje = Ukupna udaljenost / Brzina
+         const durationSeconds = totalScrollDistance / desiredSpeedPxPerSec;
+         // console.log(`updateRunningText: Izračunato trajanje animacije: ${durationSeconds.toFixed(2)}s`); // KOMENTIRANO: Previše logova
+
+
+         // Ponovno primijeni animation svojstvo s izračunatim trajanjem
+         runningTextSpan.style.animation = `marquee ${durationSeconds}s linear infinite`;
+
+         // Ažuriraj vidljivost kontejnera na temelju stanja aplikacije (tekst postoji, nije otvoren modal, nije vidljiv share prompt, itd.)
+         updateRunningTextVisibility();
+         // console.log("updateRunningText: Završeno, pozvana updateRunningTextVisibility."); // KOMENTIRANO: Previše logova
     }
 
     // MODIFICIRANA checkSharePrompt: Dodana provjera za modal ručnog unosa

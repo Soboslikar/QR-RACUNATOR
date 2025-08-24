@@ -469,43 +469,49 @@
         }
     };
 
-    function updateMainActionButtonsVisibility() {
-        if (!adsButton || !installPwaBtn || !totalDiv) return;
+   function updateMainActionButtonsVisibility() {
+    if (!adsButton || !installPwaBtn || !totalDiv) return;
 
-        const showActionButtonsArea = ukupno <= 0 && povijest.length === 0;
+    // 1. Glavni uvjet: Prikazujemo li uopće ikakav akcijski gumb?
+    const showActionButtonsArea = ukupno <= 0 && povijest.length === 0;
 
-        if (!showActionButtonsArea) {
-            adsButton.style.display = 'none';
-            installPwaBtn.style.display = 'none';
-            totalDiv.style.display = 'block';
-            return;
-        }
-
-        totalDiv.style.display = 'none';
-
-        const showAds = adsConfiguration.enabled && adsConfiguration.adsList && adsConfiguration.adsList.length > 0;
-        if (showAds) {
-            adsButton.innerText = adsConfiguration.buttonText || "POGLEDAJ PONUDE";
-            adsButton.style.display = 'block';
-        } else {
-            adsButton.style.display = 'none';
-        }
-
-        const canInstall = deferredInstallPrompt !== null;
-        const userRejectedInstall = localStorage.getItem(PWA_PROMPT_REJECTED_KEY) === 'true';
-        const isAppInstalled = window.matchMedia('(display-mode: standalone)').matches;
-        const showInstall = canInstall && !userRejectedInstall && !isAppInstalled;
-
-        if (showInstall) {
-            installPwaBtn.style.display = 'block';
-        } else {
-            installPwaBtn.style.display = 'none';
-        }
-
-        if (!showAds && !showInstall) {
-            totalDiv.style.display = 'block';
-        }
+    if (!showActionButtonsArea) {
+        // Ako ne, sakrij sve i prikaži samo total. Kraj priče.
+        adsButton.style.display = 'none';
+        installPwaBtn.style.display = 'none';
+        totalDiv.style.display = 'block';
+        return;
     }
+
+    // Ako je glavni uvjet ispunjen, sakrivamo total i provjeravamo gumbe.
+    totalDiv.style.display = 'none';
+
+    // 2. Provjera uvjeta za gumb INSTALIRAJ
+    const canInstall = deferredInstallPrompt !== null;
+    const userRejectedInstall = localStorage.getItem(PWA_PROMPT_REJECTED_KEY) === 'true';
+    const isAppInstalled = window.matchMedia('(display-mode: standalone)').matches;
+    const showInstall = canInstall && !userRejectedInstall && !isAppInstalled;
+
+    if (showInstall) {
+        installPwaBtn.style.display = 'block';
+    } else {
+        installPwaBtn.style.display = 'none';
+    }
+
+    // 3. Provjera uvjeta za gumb OGLASI
+    const showAds = adsConfiguration.enabled && adsConfiguration.adsList && adsConfiguration.adsList.length > 0;
+    if (showAds) {
+        adsButton.innerText = adsConfiguration.buttonText || "POGLEDAJ PONUDE";
+        adsButton.style.display = 'block';
+    } else {
+        adsButton.style.display = 'none';
+    }
+
+    // 4. Fallback: Ako se na kraju ne prikazuje nijedan gumb, ipak prikaži total.
+    if (!showAds && !showInstall) {
+        totalDiv.style.display = 'block';
+    }
+}
     
     function updateSmallHistoryList() { if (!historyList || !historyDiv) return; if (povijest.length > 0) { historyDiv.style.display = 'block'; historyList.innerHTML = ''; const recentHistory = povijest; recentHistory.forEach((item, index) => { const globalIndex = povijest.length - recentHistory.length + index; const listItem = document.createElement('li'); listItem.innerText = `${globalIndex + 1}. ${item.time} - ${item.amount.toFixed(2)} €`; historyList.appendChild(listItem); }); historyDiv.scrollTop = historyDiv.scrollHeight; } else { historyDiv.style.display = 'none'; } }
     function checkRemoveButtonVisibility() { if (!removeButton) return; removeButton.style.display = (povijest.length > 0 || currentSessionName) ? 'block' : 'none'; if (povijest.length === 0 && !currentSessionName && (removeConfirm || removeNameConfirm)) resetRemoveMode(); }

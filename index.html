@@ -470,46 +470,56 @@
     };
 
    function updateMainActionButtonsVisibility() {
-    if (!adsButton || !installPwaBtn || !totalDiv) return;
-
-    // 1. Glavni uvjet: Prikazujemo li uopće ikakav akcijski gumb?
-    const showActionButtonsArea = ukupno <= 0 && povijest.length === 0;
-
-    if (!showActionButtonsArea) {
-        // Ako ne, sakrij sve i prikaži samo total. Kraj priče.
-        adsButton.style.display = 'none';
-        installPwaBtn.style.display = 'none';
-        totalDiv.style.display = 'block';
+    if (!adsButton || !installPwaBtn || !totalDiv) {
+        // Ako ključni elementi ne postoje, prekini izvođenje
         return;
     }
 
-    // Ako je glavni uvjet ispunjen, sakrivamo total i provjeravamo gumbe.
-    totalDiv.style.display = 'none';
+    // --- Korak 1: Definiramo uvjete za prikaz svakog gumba ---
 
-    // 2. Provjera uvjeta za gumb INSTALIRAJ
+    // Uvjet za prikaz gumba za OGLASE (logika iz prve, ispravne verzije)
+    const showAdsButton = adsConfiguration.enabled && 
+                          adsConfiguration.adsList && 
+                          adsConfiguration.adsList.length > 0 && 
+                          ukupno <= 0 && 
+                          povijest.length === 0;
+
+    // Uvjet za prikaz gumba za INSTALACIJU
     const canInstall = deferredInstallPrompt !== null;
     const userRejectedInstall = localStorage.getItem(PWA_PROMPT_REJECTED_KEY) === 'true';
     const isAppInstalled = window.matchMedia('(display-mode: standalone)').matches;
-    const showInstall = canInstall && !userRejectedInstall && !isAppInstalled;
+    const showInstallButton = canInstall && 
+                              !userRejectedInstall && 
+                              !isAppInstalled &&
+                              ukupno <= 0 &&
+                              povijest.length === 0;
 
-    if (showInstall) {
+    // --- Korak 2: Prikazujemo ili skrivamo gumbe na temelju uvjeta ---
+
+    // Upravljanje gumbom za INSTALACIJU
+    if (showInstallButton) {
         installPwaBtn.style.display = 'block';
     } else {
         installPwaBtn.style.display = 'none';
     }
 
-    // 3. Provjera uvjeta za gumb OGLASI
-    const showAds = adsConfiguration.enabled && adsConfiguration.adsList && adsConfiguration.adsList.length > 0;
-    if (showAds) {
+    // Upravljanje gumbom za OGLASE
+    if (showAdsButton) {
         adsButton.innerText = adsConfiguration.buttonText || "POGLEDAJ PONUDE";
         adsButton.style.display = 'block';
     } else {
         adsButton.style.display = 'none';
     }
 
-    // 4. Fallback: Ako se na kraju ne prikazuje nijedan gumb, ipak prikaži total.
-    if (!showAds && !showInstall) {
+    // --- Korak 3: Odlučujemo hoćemo li prikazati ukupan iznos ---
+
+    // Prikazujemo "UKUPNO" samo ako se NE prikazuje NIJEDAN od akcijskih gumba.
+    // To pokriva slučajeve kad je sesija aktivna (ukupno > 0) ili
+    // kad je sesija prazna, ali nema ni oglasa ni opcije za instalaciju.
+    if (!showAdsButton && !showInstallButton) {
         totalDiv.style.display = 'block';
+    } else {
+        totalDiv.style.display = 'none';
     }
 }
     

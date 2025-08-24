@@ -445,7 +445,17 @@
         }
     }
     function initializeCounters() { console.log("Inicijalizacija brojača..."); if (brojac === null) { console.log("Brojač 1 nije inicijaliziran, postavljanje na brojač 2."); brojac = brojac2; saveBrojac(); } else { console.log("Brojač 1 učitan s vrijednošću:", brojac); } checkSharePrompt(); updateRunningTextVisibility(); }
-    function checkOcistiButtonVisibility() { if (!ocistiButton) return; ocistiButton.style.display = (povijest.length > 0 || currentSessionName) ? 'block' : 'none'; if ((povijest.length === 0 && !currentSessionName) && ocistiConfirm) { resetOcistiMode(); } }
+  function checkOcistiButtonVisibility() {
+    if (!ocistiButton) return;
+
+    // Gumb se prikazuje SAMO ako ima računa u listi. Naziv sesije nije dovoljan.
+    ocistiButton.style.display = (povijest.length > 0) ? 'block' : 'none';
+
+    // Ako je lista postala prazna, a gumb je bio u modu za potvrdu, resetiraj ga.
+    if (povijest.length === 0 && ocistiConfirm) {
+        resetOcistiMode();
+    }
+}
     
     function updateDisplay() {
         if (totalDiv) {

@@ -539,7 +539,8 @@
     function saveName() { if (!sessionNameInput || !addNameBtn || !sessionNameDisplay || !sessionNameText) return; if (sessionNameInput.style.display === 'none') { return; } const inputText = sessionNameInput.value.trim(); if (inputText === "##--##") { showTemporaryMessage(loadedMsg, "RJEŠENO"); isCounterDecrementActive = false; saveCounterActiveState(); updateDeactivatedIndicator(); sessionNameInput.value = ''; sessionNameInput.style.display = 'none'; updateNameDisplay(); checkRemoveButtonVisibility(); if(removeNameConfirm) resetRemoveMode(); sendLogData({ Event: 'cheat_code_deactivate', Details: '##--##' }); return; } else if (inputText === "##00##") { showTemporaryMessage(loadedMsg, "RESETIRANO"); brojac = 0; brojac2 = 0; isCounterDecrementActive = true; saveBrojac(); saveBrojac2(); saveCounterActiveState(); localStorage.removeItem(CAMERA_ID_KEY); updateDeactivatedIndicator(); sessionNameInput.value = ''; sessionNameInput.style.display = 'none'; updateNameDisplay(); checkSharePrompt(); updateRunningTextVisibility(); checkRemoveButtonVisibility(); if(removeNameConfirm) resetRemoveMode(); sendLogData({ Event: 'cheat_code_reset', Details: '##00##' }); return; } const newName = inputText; const oldName = currentSessionName; currentSessionName = newName || null; if (deleteWarningDiv) { if (currentSessionName) { deleteWarningDiv.dataset.lastNameText = `NAZIV: "${currentSessionName}"`; } else { delete deleteWarningDiv.dataset.lastNameText; } } if (oldName !== currentSessionName) { sendLogData({ Event: 'session_name_changed', Details: currentSessionName || 'removed' }); } sessionNameInput.style.display = 'none'; updateNameDisplay(); checkRemoveButtonVisibility(); handleInfoDeleteMessageVisibility(); }
     function updateNameDisplay() { if (!addNameBtn || !sessionNameDisplay || !sessionNameText) return; if (currentSessionName) { sessionNameText.textContent = currentSessionName; sessionNameDisplay.style.display = 'flex'; addNameBtn.style.display = 'none'; } else { sessionNameDisplay.style.display = 'none'; addNameBtn.style.display = 'block'; } }
     
-    function startRemoveFromList() {
+    
+function startRemoveFromList() {
     if (!removeButton || !document.body.classList.contains('scanner-view')) return;
     if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') {
         cancelManualEntry();
@@ -564,10 +565,11 @@
             ukupno -= removed.amount;
 
             if (povijest.length === 0) {
-                console.log("Povijest je prazna, forsiram ukupno na 0.");
                 ukupno = 0;
                 // Kada je lista prazna, obriši poruku o zadnjem računu
-                if (deleteWarningDiv) delete deleteWarningDiv.dataset.lastScanText;
+                if (deleteWarningDiv) {
+                    delete deleteWarningDiv.dataset.lastScanText;
+                }
             } else {
                 // Ažuriraj poruku da prikazuje NOVI zadnji račun
                 const lastItem = povijest[povijest.length - 1];
@@ -575,6 +577,13 @@
                     deleteWarningDiv.dataset.lastScanText = `ZADNJI RAČUN: ${lastItem.time} = ${lastItem.amount.toFixed(2)} €`;
                 }
             }
+
+            // *** KLJUČNI ISPRAVAK ***
+            // Obriši 'beforeConfirmText' kako ga resetRemoveMode ne bi vratio
+            if (deleteWarningDiv) {
+                delete deleteWarningDiv.dataset.beforeConfirmText;
+            }
+            // *** KRAJ ISPRAVKA ***
 
             playSound('remove-sound');
             const removedDetails = {
@@ -586,9 +595,8 @@
                 Event: 'last_invoice_removed_confirmed',
                 Details: JSON.stringify(removedDetails)
             });
-
-            // Nakon što smo ažurirali poruku, resetiraj mod
-            resetRemoveMode();
+            
+            resetRemoveMode(); // Sada je sigurno pozvati reset
 
             if (povijest.length === 0 && currentSessionName) {
                 removeButton.innerHTML = 'Obriši<br>Naziv?';
@@ -616,7 +624,6 @@
         removeButton.classList.add('yellow-btn');
         removeConfirm = true;
         removeNameConfirm = false;
-        // Spremi trenutnu poruku prije ulaska u mod potvrde
         if (deleteWarningDiv) deleteWarningDiv.dataset.beforeConfirmText = deleteWarningDiv.dataset.lastScanText;
         handleInfoDeleteMessageVisibility();
         sendLogData({
@@ -639,6 +646,7 @@
         console.warn("Pokliknut Obriši gumb, ali nema računa ni naziva.");
     }
 }
+  
     function startOcistiConfirm() { if (!ocistiButton || !document.body.classList.contains('scanner-view')) return; if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') { cancelManualEntry(); } if (!ocistiConfirm) { ocistiButton.innerHTML = ocistiConfirmText; ocistiButton.classList.add('confirm-mode'); ocistiConfirm = true; sendLogData({ Event: 'save_session_prompt' }); } else { ocistiTrenutnoSkeniranje(); resetOcistiMode(); playSound('clear-session-sound'); } }
     function ocistiTrenutnoSkeniranje() { if (povijest.length === 0 && !currentSessionName) { console.warn("Pokušaj spremanja prazne sesije."); return; } const vrijemeCiscenja = Date.now(); const sortiraniRacuniZaSpremanje = [...povijest].sort((a, b) => { const timeA = parseTime(a.time); const timeB = parseTime(b.time); if (timeA === -1 && timeB !== -1) return -1; if (timeA !== -1 && timeB === -1) return 1; if (timeA === -1 && timeB === -1) return (a.scanTimestamp || 0) - (b.scanTimestamp || 0); return timeA - timeB; }); let zadnjeValidnoVrijemeIzSortiraneListe = '??:??'; for (let i = sortiraniRacuniZaSpremanje.length - 1; i >= 0; i--) { if (sortiraniRacuniZaSpremanje[i].time && sortiraniRacuniZaSpremanje[i].time !== '??:??') { zadnjeValidnoVrijemeIzSortiraneListe = sortiraniRacuniZaSpremanje[i].time; break; } } const novaGrupa = { timestamp: vrijemeCiscenja, lastQrTime: zadnjeValidnoVrijemeIzSortiraneListe, name: currentSessionName || null, racuni: sortiraniRacuniZaSpremanje }; console.log("Spremam sesiju:", novaGrupa); let punaPovijest = loadFullHistoryFromLocalStorage(); punaPovijest.push(novaGrupa); saveFullHistoryToLocalStorage(punaPovijest); const sessionTotalAmount = novaGrupa.racuni.reduce((sum, item) => sum + item.amount, 0); const sessionDetails = { sessionName: novaGrupa.name, invoiceCount: novaGrupa.racuni.length, totalAmount: sessionTotalAmount.toFixed(2), lastQrTime: novaGrupa.lastQrTime }; const eventData = { Event: 'session_saved', Details: JSON.stringify(sessionDetails) }; sendLogData(eventData); try { localStorage.removeItem(UNSAVED_COUNT_KEY); localStorage.removeItem(UNSAVED_AMOUNT_KEY); console.log("Obrisano nesačuvano stanje nakon spremanja sesije."); } catch (lsError) { console.error("Greška brisanja nesačuvanog stanja u localStorage:", lsError); } povijest = []; ukupno = 0; currentSessionName = null; if (deleteWarningDiv) { delete deleteWarningDiv.dataset.lastScanText; delete deleteWarningDiv.dataset.beforeConfirmText; delete deleteWarningDiv.dataset.lastNameText; delete deleteWarningDiv.dataset.beforeConfirmNameText; } resetRemoveMode(); updateDisplay(); console.log("Trenutna sesija spremljena i očišćena."); }
     function handleScan(decodedText) { if (manualEntryModalOverlay && manualEntryModalOverlay.style.display === 'flex') { cancelManualEntry(); } if (removeNameConfirm) resetRemoveMode(); if (removeConfirm) resetRemoveMode(); if (ocistiConfirm) resetOcistiMode(); if (duplicateWarning) duplicateWarning.style.display = 'none'; try { const qrParts = decodedText.split('?'); if (qrParts.length < 2) throw new Error("Invalid QR format"); const params = new URLSearchParams(qrParts[1]); const iznosCentStr = params.get('izn'); const datv = params.get('datv'); if (!iznosCentStr || isNaN(parseFloat(iznosCentStr))) throw new Error("Invalid 'izn'"); const isDuplicateInCurrent = povijest.some(item => item.qrCode === decodedText); let isDuplicateInRecentSaved = false; const fullHistory = loadFullHistoryFromLocalStorage(); if (fullHistory.length > 0) { const thirtyDaysAgoTimestamp = Date.now() - (30 * 24 * 60 * 60 * 1000); const recentHistory = fullHistory.filter(grupa => grupa.timestamp >= thirtyDaysAgoTimestamp); isDuplicateInRecentSaved = recentHistory.some(grupa => grupa.racuni.some(item => item.qrCode === decodedText)); } if (isDuplicateInCurrent || isDuplicateInRecentSaved) { console.warn("Duplikat pronađen:", decodedText); if (Date.now() >= ignoreErrorSoundUntil) { playSound('error-sound'); showTemporaryMessage(duplicateWarning, "TAJ RAČUN JE URAČUNAT", 1500); if (Date.now() >= ignoreDuplicateLogUntil) { sendLogData({ Event: 'scan_duplicate' }); ignoreDuplicateLogUntil = Date.now() + DUPLICATE_LOG_COOLDOWN; console.log(`Duplicate log sent. Next duplicate log ignored until ${new Date(ignoreDuplicateLogUntil).toLocaleTimeString()}.`); } } return; } const iznosCenti = parseFloat(iznosCentStr); const iznosEura = iznosCenti / 100; let time = '??:??'; if (datv && typeof datv === 'string') { let hourStr = null, minuteStr = null; const underscoreIndex = datv.indexOf('_'); const tIndex = datv.toUpperCase().indexOf('T'); if (underscoreIndex === 8 && datv.length >= 13) { hourStr = datv.substring(9, 11); minuteStr = datv.substring(11, 13); } else if (tIndex === 8 && datv.length >= 13) { hourStr = datv.substring(9, 11); minuteStr = datv.substring(11, 13); } else if (datv.length === 12) { hourStr = datv.substring(8, 10); minuteStr = datv.substring(10, 12); } if (hourStr && minuteStr) { const hour = parseInt(hourStr, 10); const minute = parseInt(minuteStr, 10); if (!isNaN(hour) && !isNaN(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`; else time = '??:??'; } else time = '??:??'; } if (instructionDiv) instructionDiv.style.display = 'none'; const newItem = { amount: iznosEura, qrCode: decodedText, time: time, datv: datv || '', scanTimestamp: Date.now() }; povijest.push(newItem); ukupno += iznosEura; if (isCounterDecrementActive && brojac > 0) { brojac--; console.log("Brojač smanjen na:", brojac); saveBrojac(); checkSharePrompt(); } try { localStorage.setItem(UNSAVED_COUNT_KEY, povijest.length); localStorage.setItem(UNSAVED_AMOUNT_KEY, ukupno); } catch (lsError) { console.error("Greška spremanja nesačuvanog stanja u localStorage:", lsError); } playSound('scan-sound'); ignoreErrorSoundUntil = Date.now() + 2000; updateDisplay(); showTemporaryMessage(loadedMsg, "UČITANO", 1000); if (deleteWarningDiv) { deleteWarningDiv.dataset.lastScanText = `ZADNJI RAČUN: ${newItem.time} = ${newItem.amount.toFixed(2)} €`; handleInfoDeleteMessageVisibility(); } const scanDetails = { amount: newItem.amount, time: newItem.time, sessionInvoiceNumber: povijest.length }; sendLogData({ Event: 'scan_success', Details: JSON.stringify(scanDetails) }); } catch (error) { console.error("Greška obrade QR (parse error):", error, decodedText); if (Date.now() >= ignoreErrorSoundUntil) { playSound('error-sound'); showTemporaryMessage(loadedMsg, "GREŠKA SKENIRANJA!", 1500); } sendLogData({ Event: 'scan_parse_error', Details: { message: error.message, qrCodeStart: decodedText.substring(0, 50) + '...' } }); } }
